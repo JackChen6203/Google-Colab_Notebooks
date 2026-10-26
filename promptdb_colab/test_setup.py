@@ -34,6 +34,20 @@ class SetupTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 setup.validate_db(path)
 
+    def test_workflow_import_and_overwrite_protection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'private'
+            source.mkdir()
+            workflow = source / 'landscape.json'
+            workflow.write_text('{"nodes": []}', encoding='utf-8')
+            setup.import_workflows(root / 'comfy', source)
+            target = root / 'comfy/user/default/workflows/PromptDB-Drive/landscape.json'
+            self.assertEqual(target.read_bytes(), workflow.read_bytes())
+            target.write_text('{"nodes": [{"id":1}]}', encoding='utf-8')
+            with self.assertRaises(FileExistsError):
+                setup.import_workflows(root / 'comfy', source)
+
 
 if __name__ == "__main__":
     unittest.main()

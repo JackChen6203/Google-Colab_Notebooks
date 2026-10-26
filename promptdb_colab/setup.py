@@ -76,6 +76,20 @@ def download_models(comfy, manifest):
             temporary.unlink(missing_ok=True)
 
 
+def import_workflows(comfy, source):
+    """Copy selected UI workflows to the menu without changing their node data."""
+    target = Path(comfy) / 'user/default/workflows/PromptDB-Drive'
+    for path in sorted(Path(source).glob('*.json')):
+        workflow = json.loads(path.read_text(encoding='utf-8-sig'))
+        if not isinstance(workflow, dict) or not isinstance(workflow.get('nodes'), list):
+            raise ValueError(f'Expected a ComfyUI UI workflow: {path}')
+        target.mkdir(parents=True, exist_ok=True)
+        dst = target / path.name
+        if dst.exists() and dst.read_bytes() != path.read_bytes():
+            raise FileExistsError(f'Refusing to overwrite workflow: {dst}')
+        shutil.copyfile(path, dst)
+
+
 def audit(comfy, workflows, endpoint):
     with urllib.request.urlopen(endpoint.rstrip("/") + "/object_info") as response:
         registered = json.load(response)
