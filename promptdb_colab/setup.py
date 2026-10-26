@@ -61,7 +61,7 @@ def configure_model_cache(comfy, cache):
         raise
 
 
-def install(comfy, data=None):
+def install(comfy, data=None, preserve_existing=False):
     comfy = Path(comfy)
     if not (comfy / "main.py").is_file():
         raise ValueError("Not a ComfyUI installation")
@@ -81,6 +81,9 @@ def install(comfy, data=None):
         validate_db(src)
         dst = target / name
         if dst.exists() and dst.read_bytes() != src.read_bytes():
+            if preserve_existing:
+                validate_db(dst)
+                continue
             raise FileExistsError(f"Refusing to overwrite existing database: {dst}")
         shutil.copyfile(src, dst)
     import_workflows(comfy, Path(__file__).parent / "examples/workflows")

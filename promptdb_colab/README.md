@@ -1,12 +1,18 @@
 # PromptDB on Colab
 
 通用 PromptDB 安裝工具，沿用 Isi-dev/Google-Colab_Notebooks 的 fork。
-根目錄 `ComfyUI_PromptDB.ipynb` 現在使用原專案完整 FLUX.1-dev USO ComfyUI notebook，
-包含其模型下載、自訂節點安裝、ComfyUI-Manager、Cloudflare／Colab 視窗連線選項與原有 VRAM 判斷。
+根目錄 `ComfyUI_PromptDB.ipynb` 是單一 Krea2 notebook，包含 Drive 掛載、提示 JSON 上傳與自動載入、
+模型下載與 Drive 快取、原工作流需要的節點，以及 Cloudflare Tunnel 直連。
+首次上傳請勾選 `upload_prompt`，選取一般用途 `prompt_defalut.json` 或其他名稱的 JSON。
+檔案保存在 `MyDrive/ComfyUI-PromptDB/user-db/`，目前選擇記在 `active_prompt.json`。
+下次不勾選上傳即可自動載入上次選擇；首次沒有資料則建立一般旅拍範例。
+提示格式是分類 → 提示名稱 → 字串。覆蓋同名檔案前會備份，資料庫連結到 Drive，因此節點儲存修改也會保留。
+執行「全部執行」後，在最後一格點「開啟 ComfyUI」。Drive 授權須由使用者自行完成。
+本次單一 notebook 的語法、整合與上傳備份檢查通過；Drive 授權及新 notebook 全程重跑尚未驗證。
 `ComfyUI/` 底下全部 17 份 notebooks 也已加入相同整合；各自保留其原有功能，
 不代表原本沒有 Manager 的 notebook 會額外安裝 Manager。
 
-選 GPU runtime，先執行新增的「PromptDB：安裝與私人 Drive 選項」，再依序執行原儲存格。
+若使用 `ComfyUI/` 中保留的上游 notebooks，選 GPU runtime，先執行新增的「PromptDB：安裝與私人 Drive 選項」，再依序執行原儲存格。
 PromptDB 會在原程式啟動 ComfyUI 前安裝，因此不需另開精簡 notebook 或重啟服務。
 Z-Image 原本使用直接出圖介面而非 ComfyUI 網頁；保留此介面，在 Generate Image
 儲存格新增資料庫／分類／名稱欄位，留空則使用原提示文字。

@@ -5,7 +5,7 @@ A Collection of Google Colab Notebooks for scripts & projects
 
 [Open full ComfyUI + PromptDB in Colab](https://colab.research.google.com/github/JackChen6203/Google-Colab_Notebooks/blob/codex/colab-promptdb/ComfyUI_PromptDB.ipynb) · [繁體中文使用說明](promptdb_colab/README.md)
 
-The main entry preserves the full upstream FLUX.1-dev USO ComfyUI setup and launch options.
+The main entry is a single Krea2 notebook with Cloudflare Tunnel, persistent Google Drive models, and local prompt JSON upload plus automatic reload. The upstream notebooks remain under `ComfyUI/`.
 All 17 notebooks under `ComfyUI/` now install PromptDB before startup, while retaining their original model downloads and custom nodes.
 Run the new PromptDB options cell first, then run the original cells in order. Private Drive import is optional.
 Verified on a Colab T4: full ComfyUI web interface, all 37 Krea2 example nodes, PromptDB dropdowns, and actual Krea2 image generation from both API and the web Run button (256×256, 2 steps). See the integration guide for limits and model options.

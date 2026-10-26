@@ -124,4 +124,5 @@ if __name__ == '__main__':
         print(path.relative_to(ROOT))
     # The main entry now uses a full upstream ComfyUI UI notebook.
     source = ROOT / 'ComfyUI/ComfyUI_Flux1Dev_USO/ComfyUI_Flux1Dev_USO.ipynb'
-    (ROOT / 'ComfyUI_PromptDB.ipynb').write_bytes(source.read_bytes())
+    import runpy
+    runpy.run_path(str(ROOT / 'promptdb_colab/build_single_notebook.py'), run_name='__main__')

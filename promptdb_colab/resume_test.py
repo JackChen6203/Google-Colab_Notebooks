@@ -12,13 +12,13 @@ import urllib.request
 from pathlib import Path
 
 
-def main():
+def main(verify_sample=True):
     comfy = Path('/content/ComfyUI')
     root = Path(__file__).parent
     spec = importlib.util.spec_from_file_location('resume_promptdb_setup', root / 'setup.py')
     helper = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(helper)
-    helper.install(comfy)
+    helper.install(comfy, preserve_existing=True)
     changed = helper.configure_web_navigation(comfy)
     if changed:
         # Restart only this runtime's known ComfyUI command; retain models and other services.
@@ -57,7 +57,8 @@ def main():
                 time.sleep(1)
         else:
             raise TimeoutError('Inspect /content/comfyui-resume.log')
-    subprocess.run([sys.executable, str(root / 'verify_runtime.py')], check=True)
+    if verify_sample:
+        subprocess.run([sys.executable, str(root / 'verify_runtime.py')], check=True)
     executable = shutil.which('cloudflared')
     if not executable:
         raise FileNotFoundError('Run the original notebook with use_cloudflare enabled first')
