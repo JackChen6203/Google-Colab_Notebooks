@@ -146,6 +146,13 @@ def download_models(comfy, manifest, force_verify=False):
                 pending.unlink(missing_ok=True)
         if dst.exists():
             if not force_verify:
+                expected_size = entry.get('size')
+                if isinstance(expected_size, int) and expected_size > 0:
+                    actual_size = dst.stat().st_size
+                    if actual_size != expected_size:
+                        raise ValueError(f'Existing model size mismatch: {dst}; expected {expected_size}, got {actual_size}. File preserved.')
+                    print(f'Using existing model: {dst.name}; size matches, SHA256 skipped (force_verify_models=False).', flush=True)
+                    continue
                 try:
                     cached = json.loads(receipt.read_text(encoding='utf-8'))
                 except (OSError, ValueError):

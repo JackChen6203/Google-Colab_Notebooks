@@ -12,6 +12,29 @@ spec.loader.exec_module(setup)
 
 
 class SetupTests(unittest.TestCase):
+    def test_size_only_mode_never_reads_existing_model_without_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            model = root / 'models/test.safetensors'
+            model.parent.mkdir()
+            model.write_bytes(b'valid')
+            manifest = root / 'manifest.json'
+            manifest.write_text(json.dumps([{'path': model.name, 'url': 'https://example.com/model',
+                                             'size': 5, 'sha256': hashlib.sha256(b'valid').hexdigest()}]))
+            original = Path.open
+            def guarded(path, *args, **kwargs):
+                if path.resolve() == model.resolve():
+                    raise AssertionError('Full model read attempted')
+                return original(path, *args, **kwargs)
+            with patch.object(Path, 'open', guarded):
+                setup.download_models(root, manifest)
+                with self.assertRaises(AssertionError):
+                    setup.download_models(root, manifest, force_verify=True)
+            model.write_bytes(b'truncated')
+            with self.assertRaisesRegex(ValueError, 'size mismatch'):
+                setup.download_models(root, manifest)
+            self.assertEqual(model.read_bytes(), b'truncated')
+
     def test_verified_model_reuse_force_and_changed_content(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

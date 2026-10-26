@@ -1,16 +1,19 @@
 [
   {
     "path": "diffusion_models/Neutrino_v2_base_nvfp4_svd.safetensors",
+    "size": 8167362324,
     "url": "https://huggingface.co/Crowlley/Krea2Neutrino/resolve/347783b20f638e3ee5984607db5f1a51939f8afa/Neutrino_v2_base_nvfp4_svd.safetensors",
     "sha256": "6844374f31e7de278c3408b6333b8fbb7bf5cdd1321646d5480bf1aeda683e1a"
   },
   {
     "path": "text_encoders/qwen3vl_4b_fp8_scaled.safetensors",
+    "size": 5242467968,
     "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/1171f4dc7e325bf3734586942e737872506c73e1/text_encoders/qwen3vl_4b_fp8_scaled.safetensors",
     "sha256": "54bd5144df0bbc25dd6ccadfcb826b521445a1b06ae5a42570bdd2974ca87094"
   },
   {
     "path": "vae/qwen_image_vae.safetensors",
+    "size": 253806246,
     "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/1171f4dc7e325bf3734586942e737872506c73e1/vae/qwen_image_vae.safetensors",
     "sha256": "a70580f0213e67967ee9c95f05bb400e8fb08307e017a924bf3441223e023d1f"
   }
