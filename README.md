@@ -8,7 +8,7 @@ A Collection of Google Colab Notebooks for scripts & projects
 The main entry preserves the full upstream FLUX.1-dev USO ComfyUI setup and launch options.
 All 17 notebooks under `ComfyUI/` now install PromptDB before startup, while retaining their original model downloads and custom nodes.
 Run the new PromptDB options cell first, then run the original cells in order. Private Drive import is optional.
-Local structural and installation checks pass; Colab GPU execution has not been verified.
+Verified on a Colab T4: full ComfyUI web interface, all 37 Krea2 example nodes, PromptDB dropdowns, and actual Krea2 image generation from both API and the web Run button (256×256, 2 steps). See the integration guide for limits and model options.
 
 ### Latest Notebooks
 | Notebooks | Info

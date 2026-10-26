@@ -37,7 +37,18 @@ Drive 掛載與跨次 runtime 重用仍需實測，不應只憑本機連結測�
 `examples/workflows/Krea2_PromptDB_Example.json` 保留原 `Krea2_Neutrino_PromptDB.json`
 全部 37 個節點、節點 ID、輸入輸出與連線，只更換提示、說明及輸出檔名前綴。
 安裝時會自動將此範例放進 `workflows/PromptDB-Drive/`。
-範例沿用原本的模型檔名；模型尚未隨範例上傳或下載，開啟介面不代表可以使用該模型出圖。
+範例沿用原本的模型檔名；權重檔案不直接附在 Git repository。
+勾選 `download_krea2_models` 可下載原工作流的 V2 NVFP4、Qwen3-VL 編碼器與 VAE，
+約 13.66 GB，來源與 SHA256 固定在 `models.krea2.json`；需遵循來源的 Krea 2 community license。
+
+## 從 Colab 開啟網頁
+
+安裝會在 ComfyUI `server.py` 加入一項窄範圍相容性修正：僅允許跨站的
+`GET /` 頂層頁面導航（`navigate/document`）。這讓 Colab 的 Tunnel 連結能開啟首頁。
+跨站 API、POST、iframe 與後續 Host／Origin 檢查維持原限制，未全面開啟 CORS。
+修改前的檔案保留為 `server.py.promptdb-before-navigation.bak`；若上游程式結構不符會停止並提示。
+如瀏覽器禁止 Colab 輸出元件的 Cookie，可使用原 notebook 的 `use_cloudflare` 選項。
+Cloudflare 臨時網址會公開該 runtime 的 ComfyUI，結束 runtime 後失效。
 在畫面上重新選擇資料庫、分類與提示，將 STRING 接到文字編碼器。
 
 ## 模型與節點
@@ -55,7 +66,12 @@ Drive 掛載與跨次 runtime 重用仍需實測，不應只憑本機連結測�
 不代表模型相容、子圖依賴完整或 GPU 記憶體足夠。遇到缺少節點時，先查閱其官方安裝需求。
 不會自動安裝工作流宣稱需要的任意程式碼。
 
-Colab 啟動與 GPU 出圖尚未實測。GPU 配額、VRAM、模型載入及 UI proxy 均須在實際 runtime 驗證。
+2026-10-26 已在指定帳號的 Colab T4 實測：ComfyUI 0.42.0、前端 1.57.1、
+全部 37 個節點的範例載入、分類選單切換與提示文字更新、原 Neutrino V2 NVFP4 模型
+256×256／2 steps 出圖及網頁圖片預覽。這是執行驗證，不代表 832×1216／10 steps 的效能或畫質也已驗收。
+已另外點擊網頁「執行」按鈕完成第二張 PNG，確認不只 API 可以送出任務。
+`Krea2_PromptDB_Quick_Test.json` 保留相同 37 個節點與連線，預設 256×256／2 steps，方便先驗證環境。
+原生 Colab proxy 的輸出元件曾受瀏覽器 Cookie 問題影響；本次網頁驗收使用 Cloudflare Tunnel。
 安裝第三方套件及執行節點不構成安全隔離；掛載 Drive 會讓 runtime 能存取 Drive 資料。
 
 本機驗證：`python promptdb_colab/test_setup.py` 及 `python promptdb_colab/test_integration.py`。
