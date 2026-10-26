@@ -34,6 +34,9 @@ from google.colab import drive, files
 drive.mount('/content/drive')
 PRIVATE = Path(drive_folder)
 PRIVATE.mkdir(parents=True, exist_ok=True)
+for relative in ('models/checkpoints', 'models/diffusion_models', 'models/text_encoders', 'models/vae', 'models/loras', 'workflows', 'user-db/illustrious'):
+    (PRIVATE / relative).mkdir(parents=True, exist_ok=True)
+print('Drive folders ready:', PRIVATE)
 REPO = Path('/content/Google-Colab_Notebooks')
 COMFY = Path('/content/ComfyUI')
 def run(*args):
@@ -44,7 +47,6 @@ else:
     run('git', '-C', REPO, 'pull', '--ff-only')
 if not COMFY.exists():
     run('git', 'clone', 'https://github.com/Comfy-Org/ComfyUI.git', COMFY)
-run(sys.executable, '-m', 'pip', 'install', '-r', COMFY / 'requirements.txt')
 def module(name):
     spec = importlib.util.spec_from_file_location(name, REPO / 'promptdb_colab' / (name + '.py'))
     result = importlib.util.module_from_spec(spec)
@@ -52,8 +54,18 @@ def module(name):
     return result
 setup = module('setup')
 store = module('prompt_store')
+for filename in ('prompts.json', 'prompts_krea2.json'):
+    destination = PRIVATE / 'user-db' / filename
+    if not destination.exists():
+        store.save_upload(destination.parent, filename, (REPO / 'promptdb_colab/examples' / filename).read_bytes())
+for example in (REPO / 'promptdb_colab/examples/workflows').glob('*.json'):
+    destination = PRIVATE / 'workflows' / example.name
+    if not destination.exists():
+        destination.write_bytes(example.read_bytes())
+print('Persistent workflow files:', [p.name for p in (PRIVATE / 'workflows').glob('*.json')])
 if store_models_on_drive:
     setup.configure_model_cache(COMFY, PRIVATE / 'models')
+run(sys.executable, '-m', 'pip', 'install', '-r', COMFY / 'requirements.txt')
 ''')
 cell('code', '''# @title 2. 上傳或自動載入 Drive 提示庫
 setup.install(COMFY, preserve_existing=True)

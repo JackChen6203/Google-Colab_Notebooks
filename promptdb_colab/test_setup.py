@@ -48,7 +48,7 @@ class SetupTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 setup.import_workflows(root / 'comfy', source)
 
-    def test_model_cache_refuses_existing_model_files(self):
+    def test_model_cache_refuses_conflicting_drive_model(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             comfy = root / 'comfy'
@@ -56,6 +56,9 @@ class SetupTests(unittest.TestCase):
             (comfy / 'main.py').touch()
             model = comfy / 'models/existing.safetensors'
             model.write_bytes(b'preserve')
+            cache = root / 'drive/models'
+            cache.mkdir(parents=True)
+            (cache / model.name).write_bytes(b'different')
             with self.assertRaises(FileExistsError):
                 setup.configure_model_cache(comfy, root / 'drive/models')
             self.assertEqual(model.read_bytes(), b'preserve')
@@ -76,6 +79,25 @@ class SetupTests(unittest.TestCase):
             (cache / 'persisted.safetensors').write_bytes(b'cached')
             setup.configure_model_cache(comfy, cache)
             self.assertEqual((comfy / 'models/persisted.safetensors').read_bytes(), b'cached')
+
+    def test_existing_runtime_models_copied_and_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            comfy = root / 'comfy'
+            (comfy / 'models/checkpoints').mkdir(parents=True)
+            (comfy / 'main.py').touch()
+            original = comfy / 'models/checkpoints/example.safetensors'
+            original.write_bytes(b'actual model bytes')
+            cache = root / 'drive/models'
+            try:
+                setup.configure_model_cache(comfy, cache)
+            except OSError as error:
+                if getattr(error, 'winerror', None) != 1314:
+                    raise
+                self.assertEqual(original.read_bytes(), b'actual model bytes')
+            else:
+                self.assertEqual((comfy / 'models.runtime-original/checkpoints/example.safetensors').read_bytes(), b'actual model bytes')
+            self.assertEqual((cache / 'checkpoints/example.safetensors').read_bytes(), b'actual model bytes')
 
 
 if __name__ == "__main__":

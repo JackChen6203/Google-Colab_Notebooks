@@ -44,8 +44,29 @@ def configure_model_cache(comfy, cache):
     if models.exists():
         existing = [p for p in models.rglob('*') if p.is_file()
                     and not (p.name.startswith('put_') or p.name in {'.gitkeep', 'README.md', '.gitignore'})]
-        if existing:
-            raise FileExistsError('Enable Drive cache before downloading models; existing runtime models are preserved')
+        cache.mkdir(parents=True, exist_ok=True)
+        def checksum(path):
+            value = hashlib.sha256()
+            with path.open('rb') as stream:
+                for block in iter(lambda: stream.read(8 * 1024 * 1024), b''):
+                    value.update(block)
+            return value.digest()
+        # Check every conflict before copying or changing runtime paths.
+        for source in existing:
+            destination = inside(cache, source.relative_to(models))
+            if destination.exists() and (destination.stat().st_size != source.stat().st_size or checksum(destination) != checksum(source)):
+                raise FileExistsError(f'Drive model differs; both files preserved: {destination}')
+        for source in existing:
+            destination = inside(cache, source.relative_to(models))
+            if destination.exists():
+                continue
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            print(f'Copying existing runtime model to Drive: {source.relative_to(models)}', flush=True)
+            pending = destination.with_name(destination.name + '.migrating')
+            shutil.copyfile(source, pending)
+            if checksum(pending) != checksum(source):
+                raise IOError(f'Model copy verification failed; original preserved: {source}')
+            pending.replace(destination)
     backup = comfy / 'models.runtime-original'
     if backup.exists():
         raise FileExistsError(f'Model directory backup already exists: {backup}')
