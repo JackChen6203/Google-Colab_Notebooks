@@ -26,6 +26,40 @@ def validate_db(path):
     return data
 
 
+def configure_model_cache(comfy, cache):
+    """Point a fresh runtime's model directory to persistent Drive storage."""
+    comfy = Path(comfy).resolve()
+    models = comfy / 'models'
+    cache = Path(cache).resolve()
+    if cache == comfy or comfy in cache.parents:
+        raise ValueError('Persistent cache must be outside the runtime ComfyUI folder')
+    if models.is_symlink():
+        if models.resolve() != cache:
+            raise ValueError('Models already point to a different cache')
+        return
+    inside(comfy, 'models')
+    if not (comfy / 'main.py').is_file():
+        raise ValueError('Configure cache after cloning ComfyUI')
+    if models.exists():
+        existing = [p for p in models.rglob('*') if p.is_file()
+                    and not (p.name.startswith('put_') or p.name in {'.gitkeep', 'README.md', '.gitignore'})]
+        if existing:
+            raise FileExistsError('Enable Drive cache before downloading models; existing runtime models are preserved')
+    backup = comfy / 'models.runtime-original'
+    if backup.exists():
+        raise FileExistsError(f'Model directory backup already exists: {backup}')
+    cache.mkdir(parents=True, exist_ok=True)
+    if models.exists():
+        # The resolved model directory was checked to stay inside this ComfyUI root.
+        models.rename(backup)
+    try:
+        models.symlink_to(cache, target_is_directory=True)
+    except OSError:
+        if backup.exists():
+            backup.rename(models)
+        raise
+
+
 def install(comfy, data=None):
     comfy = Path(comfy)
     if not (comfy / "main.py").is_file():

@@ -10,6 +10,17 @@
 PromptDB 會在原程式啟動 ComfyUI 前安裝，因此不需另開精簡 notebook 或重啟服務。
 Z-Image 原本使用直接出圖介面而非 ComfyUI 網頁；保留此介面，在 Generate Image
 儲存格新增資料庫／分類／名稱欄位，留空則使用原提示文字。
+
+## Google Drive 模型快取
+
+勾選 `models_use_drive`，模型會下載到 `promptdb_drive_folder/models/`，預設為
+`/content/drive/MyDrive/ComfyUI-PromptDB/models/`。這與 `promptdb_use_drive` 的提示庫匯入選項獨立。
+每次新開 runtime 都要重新掛載 Drive、安裝 ComfyUI 與節點；模型檔案可以沿用。
+設定會在原 notebook 的模型下載程式執行前，把 runtime 的 `ComfyUI/models` 連到 Drive。
+原下載器可依既有檔案或續傳機制重用檔案；原專案使用時間戳命名的 Civitai 自訂下載仍可能另存新檔。
+Drive 讀取通常比 runtime 本機磁碟慢；這個選項不省略模型載入所需的 RAM／VRAM。
+若已在本次 runtime 下載模型，工具會保留那些檔案並停止，不會自動搬移或覆寫；請在新 runtime 一開始啟用。
+Drive 掛載與跨次 runtime 重用仍需實測，不應只憑本機連結測試宣稱已驗證。
 本版本只附一般風景範例，不包含本地提示庫、私人圖片、成人生成工作流或專用模型。
 
 ## 私人資料

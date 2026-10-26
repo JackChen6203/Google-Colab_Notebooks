@@ -4,6 +4,7 @@ import json
 import re
 import subprocess
 import unittest
+import copy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,7 +36,10 @@ class IntegrationTests(unittest.TestCase):
                 self.assertIn('install_colab_promptdb()', code)
                 if path.parent.name != 'Z_Image':
                     self.assertLess(code.index('install_colab_promptdb()'), code.index('use_cloudflare ='))
-                self.assertEqual(integrator.integrate(current), current)
+                self.assertIn('configure_colab_model_storage()', code)
+                first_download = re.search(r'^def (?:download_\w+|model_download\w*|pull)\(', code, re.M)
+                self.assertLess(code.index('configure_colab_model_storage()'), first_download.start())
+                self.assertEqual(integrator.integrate(copy.deepcopy(current), direct=path.parent.name == 'Z_Image'), current)
 
     def test_root_entry_is_full_upstream_ui(self):
         root = json.loads((ROOT / 'ComfyUI_PromptDB.ipynb').read_text(encoding='utf-8'))

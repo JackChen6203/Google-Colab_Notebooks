@@ -7,15 +7,17 @@ ROOT = Path(__file__).resolve().parents[1]
 BEGIN = "# BEGIN COLAB PROMPTDB INTEGRATION\n"
 END = "# END COLAB PROMPTDB INTEGRATION\n"
 HOOK = BEGIN + "install_colab_promptdb()\n" + END + "\n"
+STORAGE_HOOK = BEGIN + "configure_colab_model_storage()\n" + END + "\n"
 CONFIG = '''# @title PromptDB：安裝與私人 Drive 選項（先執行）
 promptdb_use_drive = False # @param {type:"boolean"}
+models_use_drive = False # @param {type:"boolean"}
 promptdb_drive_folder = "/content/drive/MyDrive/ComfyUI-PromptDB" # @param {type:"string"}
 
 from pathlib import Path as _PromptDBPath
 import subprocess as _promptdb_subprocess
 import importlib.util as _promptdb_importlib
 
-def install_colab_promptdb():
+def _promptdb_helper():
     repository = _PromptDBPath('/content/Google-Colab_Notebooks')
     if not repository.exists():
         _promptdb_subprocess.run([
@@ -26,6 +28,18 @@ def install_colab_promptdb():
         'colab_promptdb_setup', repository / 'promptdb_colab/setup.py')
     helper = _promptdb_importlib.module_from_spec(spec)
     spec.loader.exec_module(helper)
+    return helper
+
+def configure_colab_model_storage():
+    if models_use_drive:
+        from google.colab import drive
+        drive.mount('/content/drive')
+        helper = _promptdb_helper()
+        helper.configure_model_cache('/content/ComfyUI', _PromptDBPath(promptdb_drive_folder) / 'models')
+        print('Model downloads and loading now use persistent Google Drive storage.')
+
+def install_colab_promptdb():
+    helper = _promptdb_helper()
     data = None
     if promptdb_use_drive:
         from google.colab import drive
@@ -44,16 +58,23 @@ def install_colab_promptdb():
 
 
 def integrate(notebook, direct=False):
-    if any(c.get('id') == 'promptdb-options' for c in notebook['cells']):
-        return notebook
+    notebook['cells'] = [c for c in notebook['cells'] if c.get('id') != 'promptdb-options']
+    for cell in notebook['cells']:
+        if cell['cell_type'] == 'code':
+            source = ''.join(cell['source'])
+            source = re.sub(r'# BEGIN COLAB PROMPTDB INTEGRATION\n.*?# END COLAB PROMPTDB INTEGRATION\n\n', '', source, flags=re.S)
+            cell['source'] = source.splitlines(keepends=True)
     inserted = False
     for cell in notebook['cells']:
         if cell['cell_type'] != 'code':
             continue
         source = ''.join(cell['source'])
+        storage = re.search(r'^def (?:download_\w+|model_download\w*|pull)\(', source, flags=re.M)
+        if storage:
+            source = source[:storage.start()] + STORAGE_HOOK + source[storage.start():]
         if direct:
             if 'Environment Setup Complete' in source:
-                source += '\n' + HOOK
+                source = source.rstrip() + '\n\n' + HOOK
                 inserted = True
         else:
             match = re.search(r'^use_cloudflare\s*=', source, flags=re.M)

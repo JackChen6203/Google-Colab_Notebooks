@@ -48,6 +48,35 @@ class SetupTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 setup.import_workflows(root / 'comfy', source)
 
+    def test_model_cache_refuses_existing_model_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            comfy = root / 'comfy'
+            (comfy / 'models').mkdir(parents=True)
+            (comfy / 'main.py').touch()
+            model = comfy / 'models/existing.safetensors'
+            model.write_bytes(b'preserve')
+            with self.assertRaises(FileExistsError):
+                setup.configure_model_cache(comfy, root / 'drive/models')
+            self.assertEqual(model.read_bytes(), b'preserve')
+
+    def test_model_cache_link_and_reuse(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            comfy = root / 'comfy'
+            (comfy / 'models').mkdir(parents=True)
+            (comfy / 'main.py').touch()
+            cache = root / 'drive/models'
+            try:
+                setup.configure_model_cache(comfy, cache)
+            except OSError as error:
+                if getattr(error, 'winerror', None) == 1314:
+                    self.skipTest('Windows symlink privilege unavailable')
+                raise
+            (cache / 'persisted.safetensors').write_bytes(b'cached')
+            setup.configure_model_cache(comfy, cache)
+            self.assertEqual((comfy / 'models/persisted.safetensors').read_bytes(), b'cached')
+
 
 if __name__ == "__main__":
     unittest.main()
