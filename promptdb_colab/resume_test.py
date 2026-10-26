@@ -93,11 +93,22 @@ def main(verify_sample=True, output_directory=None):
     tunnel = subprocess.Popen([executable, 'tunnel', '--protocol', 'http2', '--url', endpoint], stdout=output,
                               stderr=subprocess.STDOUT, start_new_session=True)
     last_error = 'Waiting for tunnel registration'
-    for attempt in range(120):
+    started = time.monotonic()
+    deadline = started + 180
+    next_probe = started
+    next_notice = started + 30
+    retry_delay = 2
+    announced = False
+    print('正在建立 Cloudflare 連線，等待 DNS 與公開頁面就緒…', flush=True)
+    while time.monotonic() < deadline:
         text = log_path.read_text()
         found = re.search(r'https://[a-z]+(?:-[a-z]+)+\.trycloudflare\.com', text)
-        if found and 'Registered tunnel connection' in text and attempt % 3 == 0:
+        now = time.monotonic()
+        if found and 'Registered tunnel connection' in text and now >= next_probe:
             url = found.group(0)
+            if not announced:
+                print('Tunnel 已註冊，正在確認公開網址；DNS 生效可能需要一些時間。', flush=True)
+                announced = True
             try:
                 with urllib.request.urlopen(url + '/object_info/PromptDB', timeout=8) as response:
                     info = json.load(response)
@@ -114,7 +125,11 @@ def main(verify_sample=True, output_directory=None):
                 return url
             except (OSError, ValueError) as error:
                 last_error = str(error)
-                print('Tunnel registered, waiting for public DNS/HTTP:', last_error, flush=True)
+                next_probe = time.monotonic() + retry_delay
+                retry_delay = min(retry_delay * 2, 15)
+        if now >= next_notice:
+            print(f'仍在等待公開連線就緒（已等候 {int(now - started)} 秒）…', flush=True)
+            next_notice = now + 30
         if tunnel.poll() is not None:
             raise RuntimeError(text[-4000:])
         time.sleep(1)
