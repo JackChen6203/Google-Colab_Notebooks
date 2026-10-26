@@ -1,0 +1,21 @@
+{
+  "node_count": 37,
+  "link_count": 38,
+  "node_types": [
+    "CLIPLoader",
+    "CLIPTextEncode",
+    "ConditioningZeroOut",
+    "EmptyLatentImage",
+    "KSampler",
+    "Krea2CastPick",
+    "LayerUtility: TextJoinV2",
+    "MarkdownNote",
+    "PreviewAny",
+    "PromptDB",
+    "SaveImage",
+    "UNETLoader",
+    "VAEDecode",
+    "VAELoader"
+  ],
+  "prompt_nodes": 17
+}
