@@ -69,11 +69,21 @@ run(sys.executable, '-m', 'pip', 'install', '-r', COMFY / 'requirements.txt')
 cell('code', '''# @title 2. 自動載入 Drive 提示庫、工作流與模型
 setup.install(COMFY, preserve_existing=True, seed_examples=False)
 def load_database(database):
-    selected = store.select_existing(PRIVATE / 'user-db', database)
+    try:
+        selected = store.select_existing(PRIVATE / 'user-db', database)
+    except (ValueError, UnicodeError, OSError) as error:
+        print(database, '提示庫載入失敗：', error, flush=True)
+        print('保留原始檔案，不建立預設檔；繼續啟動 ComfyUI。此提示庫本次未啟用。', flush=True)
+        return
     if selected is None:
         print(database, 'No Drive JSON found; no file created.', flush=True)
         return
-    store.activate(COMFY, selected, database)
+    try:
+        store.activate(COMFY, selected, database)
+    except (ValueError, UnicodeError, OSError) as error:
+        print(database, '提示庫連結失敗：', selected, error, flush=True)
+        print('此提示庫本次未更新；繼續啟動 ComfyUI。', flush=True)
+        return
     print(database, 'Drive database:', selected, selected.stat().st_size, 'bytes', flush=True)
 load_database('krea2')
 load_database('illustrious')

@@ -5,6 +5,9 @@ import re
 import subprocess
 import unittest
 import copy
+import ast
+import types
+from unittest.mock import Mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +18,21 @@ spec.loader.exec_module(integrator)
 
 
 class IntegrationTests(unittest.TestCase):
+    def test_invalid_database_does_not_abort_notebook_startup(self):
+        notebook = json.loads((ROOT / 'ComfyUI_PromptDB.ipynb').read_text(encoding='utf-8'))
+        source = next(''.join(c['source']) for c in notebook['cells'] if 'def load_database(' in ''.join(c['source']))
+        tree = ast.parse(source)
+        loader = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'load_database')
+        selected = Mock()
+        selected.stat.return_value.st_size = 123
+        store = types.SimpleNamespace(select_existing=Mock(side_effect=[selected, ValueError('invalid nested value')]), activate=Mock())
+        scope = {'store': store, 'PRIVATE': Path('/drive'), 'COMFY': Path('/comfy'), 'print': Mock()}
+        exec(compile(ast.Module(body=[loader], type_ignores=[]), '<notebook loader>', 'exec'), scope)
+        scope['load_database']('krea2')
+        scope['load_database']('illustrious')
+        store.activate.assert_called_once_with(Path('/comfy'), selected, 'krea2')
+        self.assertTrue(any('繼續啟動 ComfyUI' in str(call) for call in scope['print'].call_args_list))
+
     def test_all_upstream_notebooks_preserved(self):
         paths = list((ROOT / 'ComfyUI').rglob('*.ipynb'))
         self.assertEqual(len(paths), 17)

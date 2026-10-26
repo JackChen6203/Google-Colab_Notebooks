@@ -9,6 +9,19 @@ spec.loader.exec_module(store)
 
 
 class StoreTests(unittest.TestCase):
+    def test_invalid_preferred_database_reports_path_without_modifying_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            source = folder / 'prompts.json'
+            content = b'{"style":{"group":{"name":"landscape"}}}'
+            source.write_bytes(content)
+            with self.assertRaises(ValueError) as caught:
+                store.select_existing(folder, 'illustrious')
+            self.assertIn(str(source), str(caught.exception))
+            self.assertIn('1 non-string', str(caught.exception))
+            self.assertEqual(source.read_bytes(), content)
+            self.assertEqual(list(folder.iterdir()), [source])
+
     def test_real_databases_win_over_old_defaults_without_writes(self):
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)

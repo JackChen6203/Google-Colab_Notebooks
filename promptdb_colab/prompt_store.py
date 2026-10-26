@@ -19,7 +19,10 @@ def select_existing(folder, database):
     for name in preferred[database]:
         candidate = folder / name
         if candidate.is_file():
-            decode(candidate.read_bytes())
+            try:
+                decode(candidate.read_bytes())
+            except (ValueError, UnicodeError) as error:
+                raise ValueError(f'{candidate}: {error}') from error
             return candidate
     candidates = sorted((folder / database).glob('*.json'))
     if database == 'krea2':
@@ -41,7 +44,15 @@ def decode(data):
         and all(isinstance(name, str) and isinstance(text, str) for name, text in entries.items())
         for category, entries in value.items()
     ):
-        raise ValueError('Expected JSON category -> prompt name -> prompt text')
+        nested = sum(
+            not isinstance(text, str)
+            for entries in value.values() if isinstance(entries, dict)
+            for text in entries.values()
+        ) if isinstance(value, dict) else 0
+        raise ValueError(
+            'Expected JSON category -> prompt name -> prompt text (string). '
+            f'Found {nested} non-string prompt values; original file was not modified.'
+        )
     return value
 
 
