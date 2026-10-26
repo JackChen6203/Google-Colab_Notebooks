@@ -64,19 +64,35 @@ def main(verify_sample=True):
         raise FileNotFoundError('Run the original notebook with use_cloudflare enabled first')
     log_path = Path('/content/cloudflare-resume.log')
     output = log_path.open('w')
-    tunnel = subprocess.Popen([executable, 'tunnel', '--url', endpoint], stdout=output,
+    tunnel = subprocess.Popen([executable, 'tunnel', '--protocol', 'http2', '--url', endpoint], stdout=output,
                               stderr=subprocess.STDOUT, start_new_session=True)
-    for _ in range(60):
+    last_error = 'Waiting for tunnel registration'
+    for attempt in range(120):
         text = log_path.read_text()
         found = re.search(r'https://[a-z]+(?:-[a-z]+)+\.trycloudflare\.com', text)
-        if found:
-            print('COMFYUI_URL:', found.group(0), flush=True)
-            print('Background service ready; generation has not been tested.', flush=True)
-            return
+        if found and 'Registered tunnel connection' in text and attempt % 3 == 0:
+            url = found.group(0)
+            try:
+                with urllib.request.urlopen(url + '/object_info/PromptDB', timeout=8) as response:
+                    info = json.load(response)
+                if 'PromptDB' not in info:
+                    raise ValueError('Public URL did not return this ComfyUI server')
+                headers = {'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document'}
+                with urllib.request.urlopen(urllib.request.Request(url + '/', headers=headers), timeout=8) as response:
+                    page = response.read().decode('utf-8')
+                if 'assets/' not in page:
+                    raise ValueError('Public landing page is not the ComfyUI frontend')
+                Path('/content/comfyui-public-url.txt').write_text(url, encoding='utf-8')
+                print('COMFYUI_URL:', url, flush=True)
+                print('Verified public ComfyUI page and PromptDB API. Generation is not part of this connection check.', flush=True)
+                return url
+            except (OSError, ValueError) as error:
+                last_error = str(error)
+                print('Tunnel registered, waiting for public DNS/HTTP:', last_error, flush=True)
         if tunnel.poll() is not None:
             raise RuntimeError(text[-4000:])
         time.sleep(1)
-    raise TimeoutError('Inspect /content/cloudflare-resume.log')
+    raise TimeoutError('Public tunnel is not reachable: ' + last_error + '\n' + log_path.read_text()[-4000:])
 
 
 if __name__ == '__main__':

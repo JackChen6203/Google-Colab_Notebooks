@@ -92,10 +92,8 @@ if not shutil.which('cloudflared'):
     urllib.request.urlretrieve('https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb', package)
     run('dpkg', '-i', package)
 resume = module('resume_test')
-resume.main(verify_sample=False)
-log = Path('/content/cloudflare-resume.log').read_text()
-import re, html
-url = re.search(r'https://[a-z]+(?:-[a-z]+)+\\.trycloudflare\\.com', log).group(0)
+url = resume.main(verify_sample=False)
+import html
 display(HTML('<a target="_blank" href="' + html.escape(url, quote=True) + '">開啟 ComfyUI</a>'))
 print('首次請選工作流程 → PromptDB-Drive → Krea2_PromptDB_Quick_Test，再按執行。')
 ''')
