@@ -45,8 +45,10 @@ class IntegrationTests(unittest.TestCase):
         root = json.loads((ROOT / 'ComfyUI_PromptDB.ipynb').read_text(encoding='utf-8'))
         full = json.loads((ROOT / 'ComfyUI/ComfyUI_Flux1Dev_USO/ComfyUI_Flux1Dev_USO.ipynb').read_text(encoding='utf-8'))
         code = '\n'.join(''.join(c['source']) for c in root['cells'])
-        for feature in ('drive.mount', 'files.upload', 'store.activate', 'resume.main', 'cloudflared', 'active_prompt.json'):
+        for feature in ('drive.mount', 'store.activate', 'resume.main', 'cloudflared', 'load_database'):
             self.assertIn(feature, code)
+        self.assertNotIn('files.upload', code)
+        self.assertNotIn('upload_prompt =', code)
         for cell in root['cells']:
             if cell['cell_type'] == 'code':
                 compile(''.join(cell['source']), '<single notebook>', 'exec')

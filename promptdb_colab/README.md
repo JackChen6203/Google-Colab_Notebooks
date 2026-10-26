@@ -1,5 +1,13 @@
 # PromptDB on Colab
 
+目前主 notebook 啟動時只從 Drive 載入，不呼叫 `files.upload()`，不會等待選檔。
+請直接在 Drive 放置：Krea2 `user-db/prompt_defalut.json`（優先）或 `user-db/prompts_krea2.json`；
+Illustrious `user-db/illustrious/prompts.json`（優先）或 `user-db/prompts.json`。
+一般工作流放 `workflows/*.json`；模型放 `models/` 對應子資料夾。
+只有 `models.krea2.json` 中三個固定模型會在 `download_krea2_models=True` 時由 Colab 自動下載，
+其他本地 checkpoint／LoRA 不在自動下載清單；自行上傳到 Drive 即可由模型目錄讀取。
+以下舊版上傳選項說明不適用於目前主 notebook。
+
 通用 PromptDB 安裝工具，沿用 Isi-dev/Google-Colab_Notebooks 的 fork。
 根目錄 `ComfyUI_PromptDB.ipynb` 是單一 Krea2 notebook，包含 Drive 掛載、提示 JSON 上傳與自動載入、
 模型下載與 Drive 快取、原工作流需要的節點，以及 Cloudflare Tunnel 直連。
