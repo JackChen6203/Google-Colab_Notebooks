@@ -49,6 +49,7 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn(feature, code)
         self.assertNotIn('files.upload', code)
         self.assertNotIn('upload_prompt =', code)
+        self.assertIn("output_directory=PRIVATE / 'output'", code)
         for cell in root['cells']:
             if cell['cell_type'] == 'code':
                 compile(''.join(cell['source']), '<single notebook>', 'exec')

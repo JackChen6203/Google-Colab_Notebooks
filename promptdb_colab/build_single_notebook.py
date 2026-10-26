@@ -30,7 +30,7 @@ from google.colab import drive
 drive.mount('/content/drive')
 PRIVATE = Path(drive_folder)
 PRIVATE.mkdir(parents=True, exist_ok=True)
-for relative in ('models/checkpoints', 'models/diffusion_models', 'models/text_encoders', 'models/vae', 'models/loras', 'workflows', 'user-db/illustrious'):
+for relative in ('output', 'models/checkpoints', 'models/diffusion_models', 'models/text_encoders', 'models/vae', 'models/loras', 'workflows', 'user-db/illustrious'):
     (PRIVATE / relative).mkdir(parents=True, exist_ok=True)
 print('Drive folders ready:', PRIVATE)
 REPO = Path('/content/Google-Colab_Notebooks')
@@ -92,7 +92,7 @@ if not shutil.which('cloudflared'):
     urllib.request.urlretrieve('https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb', package)
     run('dpkg', '-i', package)
 resume = module('resume_test')
-url = resume.main(verify_sample=False)
+url = resume.main(verify_sample=False, output_directory=PRIVATE / 'output')
 import html
 display(HTML('<a target="_blank" href="' + html.escape(url, quote=True) + '">開啟 ComfyUI</a>'))
 print('首次請選工作流程 → PromptDB-Drive → Krea2_PromptDB_Quick_Test，再按執行。')

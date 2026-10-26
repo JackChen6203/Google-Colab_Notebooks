@@ -1,5 +1,10 @@
 # PromptDB on Colab
 
+生成圖片：主 notebook 使用 `--output-directory` 將 SaveImage 輸出直接設定為
+`MyDrive/ComfyUI-PromptDB/output/`（跟隨 `drive_folder`）。第三格會印出實際路徑。
+首次切換會重啟 ComfyUI，並複製 `/content/ComfyUI/output/` 既有檔案到 Drive；
+不同內容的同名檔案加上 runtime 雜湊後綴，不刪除原檔。只有預覽、未接 SaveImage 的圖片不會永久保存。
+
 目前主 notebook 啟動時只從 Drive 載入，不呼叫 `files.upload()`，不會等待選檔。
 請直接在 Drive 放置：Krea2 `user-db/prompt_defalut.json`（優先）或 `user-db/prompts_krea2.json`；
 Illustrious `user-db/illustrious/prompts.json`（優先）或 `user-db/prompts.json`。

@@ -12,7 +12,7 @@ import urllib.request
 from pathlib import Path
 
 
-def main(verify_sample=True):
+def main(verify_sample=True, output_directory=None):
     comfy = Path('/content/ComfyUI')
     root = Path(__file__).parent
     spec = importlib.util.spec_from_file_location('resume_promptdb_setup', root / 'setup.py')
@@ -20,6 +20,30 @@ def main(verify_sample=True):
     spec.loader.exec_module(helper)
     helper.install(comfy, preserve_existing=True)
     changed = helper.configure_web_navigation(comfy)
+    output_args = []
+    if output_directory is not None:
+        destination = Path(output_directory).resolve()
+        destination.mkdir(parents=True, exist_ok=True)
+        # Preserve previously generated images before switching output directories.
+        original = comfy / 'output'
+        if original.exists() and original.resolve() != destination:
+            import hashlib
+            for source in original.rglob('*'):
+                if not source.is_file() or source.name.startswith('put_'):
+                    continue
+                target = destination / source.relative_to(original)
+                if target.exists():
+                    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+                    if hashlib.sha256(target.read_bytes()).hexdigest() == digest:
+                        continue
+                    target = target.with_name(target.stem + '-runtime-' + digest[:12] + target.suffix)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+        output_args = ['--output-directory', str(destination)]
+        marker = Path('/content/comfyui-output-directory.txt')
+        if not marker.exists() or marker.read_text() != str(destination):
+            changed = True
+        print('ComfyUI SaveImage output:', destination, flush=True)
     if changed:
         # Restart only this runtime's known ComfyUI command; retain models and other services.
         for process_dir in Path('/proc').iterdir():
@@ -45,7 +69,7 @@ def main(verify_sample=True):
         urllib.request.urlopen(endpoint + '/object_info', timeout=3).close()
     except OSError:
         output = open('/content/comfyui-resume.log', 'a')
-        process = subprocess.Popen([sys.executable, str(comfy / 'main.py'), '--cache-none', '--port', '8188'],
+        process = subprocess.Popen([sys.executable, str(comfy / 'main.py'), '--cache-none', '--port', '8188', *output_args],
                                    cwd=comfy, stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
         for _ in range(90):
             if process.poll() is not None:
@@ -57,6 +81,8 @@ def main(verify_sample=True):
                 time.sleep(1)
         else:
             raise TimeoutError('Inspect /content/comfyui-resume.log')
+    if output_directory is not None:
+        Path('/content/comfyui-output-directory.txt').write_text(str(destination))
     if verify_sample:
         subprocess.run([sys.executable, str(root / 'verify_runtime.py')], check=True)
     executable = shutil.which('cloudflared')
