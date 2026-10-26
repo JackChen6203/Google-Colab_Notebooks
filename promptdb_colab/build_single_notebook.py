@@ -18,6 +18,7 @@ cell('markdown', '''# Krea2 PromptDB — Google Drive + Cloudflare
 依序執行，或選「全部執行」。首次 Google Drive 掛載須自行授權。
 所有安裝、模型檢查、ComfyUI 啟動與 Cloudflare 連線檢查都在 Colab 虛擬機執行，無須在電腦執行程式。
 同一 runtime 已掛載 Drive 時直接沿用；新 runtime 可能需要 Google 再次授權，Notebook 無法保證永久免授權。
+模型首次完整 SHA256 驗證後，在同一 Drive 模型資料夾保存 .verified.json 紀錄；下次大小及修改時間相同即快速略過。勾選 force_verify_models 可強制重新完整驗證。
 直接載入 Drive 已有 JSON；Krea2 優先 prompts_krea2.json，Illustrious 優先 prompts.json。不生成提示庫檔案。
 提示庫、工作流與自行上傳的模型一律從 Drive 讀取，不會跳出選檔視窗。
 Cloudflare 連結公開此 runtime 的 ComfyUI；停止 runtime 後網址失效。
@@ -25,6 +26,7 @@ Cloudflare 連結公開此 runtime 的 ComfyUI；停止 runtime 後網址失效�
 cell('code', '''# @title 1. 選項與環境安裝
 store_models_on_drive = True # @param {type:"boolean"}
 download_krea2_models = True # @param {type:"boolean"}
+force_verify_models = False # @param {type:"boolean"}
 drive_folder = "/content/drive/MyDrive/ComfyUI-PromptDB" # @param {type:"string"}
 from pathlib import Path
 import subprocess, sys, importlib.util, json
@@ -97,7 +99,7 @@ print('Loading Drive workflows...', flush=True)
 setup.import_workflows(COMFY, PRIVATE / 'workflows')
 if download_krea2_models:
     print('Checking/downloading the three Krea2 model files...', flush=True)
-    setup.download_models(COMFY, REPO / 'promptdb_colab/models.krea2.json')
+    setup.download_models(COMFY, REPO / 'promptdb_colab/models.krea2.json', force_verify=force_verify_models)
 print('Model directory:', (COMFY / 'models').resolve())
 for model in sorted((PRIVATE / 'models').rglob('*.safetensors')):
     print('Available Drive model:', model.relative_to(PRIVATE), model.stat().st_size, 'bytes')

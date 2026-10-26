@@ -119,7 +119,7 @@ def configure_web_navigation(comfy):
     return module.apply(comfy)
 
 
-def download_models(comfy, manifest):
+def download_models(comfy, manifest, force_verify=False):
     entries = json.loads(Path(manifest).read_text(encoding="utf-8"))
     for entry in entries:
         dst = inside(Path(comfy) / "models", entry["path"])
@@ -132,10 +132,34 @@ def download_models(comfy, manifest):
                 for block in iter(lambda: stream.read(1024 * 1024), b""):
                     h.update(block)
             return h.hexdigest()
+        receipt = dst.with_name(dst.name + '.verified.json')
+        def fingerprint():
+            stat = dst.stat()
+            return {'version': 1, 'sha256': expected, 'size': stat.st_size,
+                    'mtime_ns': stat.st_mtime_ns}
+        def remember():
+            pending = receipt.with_name(receipt.name + '.tmp')
+            try:
+                pending.write_text(json.dumps(fingerprint()), encoding='utf-8')
+                pending.replace(receipt)
+            finally:
+                pending.unlink(missing_ok=True)
         if dst.exists():
+            if not force_verify:
+                try:
+                    cached = json.loads(receipt.read_text(encoding='utf-8'))
+                except (OSError, ValueError):
+                    cached = None
+                if cached == fingerprint():
+                    print(f'Quick check passed: {dst.name}; size/mtime match prior SHA256 verification.', flush=True)
+                    continue
+            before = fingerprint()
             print(f'Checking existing model SHA256: {dst.name} ({dst.stat().st_size / 1e9:.2f} GB); reading Drive may take several minutes.', flush=True)
             if digest(dst) != expected:
                 raise ValueError(f"Existing model checksum mismatch: {dst}")
+            if fingerprint() != before:
+                raise ValueError(f'Model changed during verification: {dst}')
+            remember()
             print(f'Verified existing model: {dst.name}; no download needed.', flush=True)
             continue
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -149,6 +173,7 @@ def download_models(comfy, manifest):
             if digest(temporary) != expected:
                 raise ValueError(f"Downloaded model checksum mismatch: {dst.name}")
             temporary.replace(dst)
+            remember()
         finally:
             temporary.unlink(missing_ok=True)
 

@@ -2,6 +2,8 @@ import importlib.util
 import json
 import tempfile
 import unittest
+import hashlib
+from unittest.mock import patch
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location("setup_promptdb", Path(__file__).with_name("setup.py"))
@@ -10,6 +12,31 @@ spec.loader.exec_module(setup)
 
 
 class SetupTests(unittest.TestCase):
+    def test_verified_model_reuse_force_and_changed_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            model = root / 'models/test.safetensors'
+            model.parent.mkdir()
+            model.write_bytes(b'valid')
+            manifest = root / 'manifest.json'
+            manifest.write_text(json.dumps([{'path': model.name, 'url': 'https://example.com/model',
+                                             'sha256': hashlib.sha256(b'valid').hexdigest()}]))
+            setup.download_models(root, manifest)
+            # An unchanged receipt must avoid opening the model, even in a new call.
+            original = Path.open
+            def guarded(path, *args, **kwargs):
+                if path.resolve() == model.resolve():
+                    raise AssertionError('Model bytes were read during quick check')
+                return original(path, *args, **kwargs)
+            with patch.object(Path, 'open', guarded):
+                setup.download_models(root, manifest)
+                with self.assertRaises(AssertionError):
+                    setup.download_models(root, manifest, force_verify=True)
+            model.write_bytes(b'changed')
+            with self.assertRaisesRegex(ValueError, 'checksum mismatch'):
+                setup.download_models(root, manifest)
+            self.assertEqual(model.read_bytes(), b'changed')
+
     def test_install_and_preserve_private_data(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
