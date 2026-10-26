@@ -117,5 +117,15 @@ import html
 display(HTML('<a target="_blank" href="' + html.escape(url, quote=True) + '">開啟 ComfyUI（Cloudflare Tunnel）</a>'))
 print('首次請選工作流程 → PromptDB-Drive → Krea2_PromptDB_Quick_Test，再按執行。')
 ''')
+cell('markdown', '''## 3. 前景服務監控與斷線診斷
+「全部執行」會進入此格持續監控實際生成佇列；可同時使用上方 Cloudflare 網址。
+佇列變更記錄保存在 Drive 的 logs/session-monitor.jsonl；本機服務無回應時另保存服務日誌尾端。
+這不是繞過閒置限制的保活：無法阻止 Google 回收 runtime、配額耗盡或最長執行時間限制，也無法在虛擬機被強制刪除後補寫日誌。
+按停止只結束監控；結束使用時請在 Colab 主動中斷並刪除 runtime，以停止 GPU 用量。
+''')
+cell('code', '''# @title 3. 持續監控 ComfyUI 生成佇列（不能阻止 Colab 回收）
+monitor = module('monitor')
+monitor.watch(PRIVATE)
+''')
 notebook = {'nbformat': 4, 'nbformat_minor': 5, 'metadata': {'accelerator': 'GPU', 'colab': {'gpuType': 'T4', 'provenance': []}, 'kernelspec': {'name': 'python3', 'display_name': 'Python 3'}, 'language_info': {'name': 'python'}}, 'cells': cells}
 (ROOT / 'ComfyUI_PromptDB.ipynb').write_text(json.dumps(notebook, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
