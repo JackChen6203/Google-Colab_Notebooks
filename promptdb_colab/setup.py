@@ -1,5 +1,6 @@
 """Install generic PromptDB and validate explicitly selected private data."""
 import argparse
+import importlib.util
 import hashlib
 import json
 import shutil
@@ -83,6 +84,13 @@ def install(comfy, data=None):
             raise FileExistsError(f"Refusing to overwrite existing database: {dst}")
         shutil.copyfile(src, dst)
     import_workflows(comfy, Path(__file__).parent / "examples/workflows")
+
+
+def configure_web_navigation(comfy):
+    spec = importlib.util.spec_from_file_location('promptdb_web_compat', Path(__file__).with_name('web_compat.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.apply(comfy)
 
 
 def download_models(comfy, manifest):

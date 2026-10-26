@@ -53,6 +53,7 @@ def install_colab_promptdb():
         if not data.is_dir():
             raise FileNotFoundError(f'Create {data} and add prompt JSON files first')
     helper.install('/content/ComfyUI', data)
+    helper.configure_web_navigation('/content/ComfyUI')
     if promptdb_use_drive:
         helper.import_workflows('/content/ComfyUI', _PromptDBPath(promptdb_drive_folder) / 'workflows')
         manifest = _PromptDBPath(promptdb_drive_folder) / 'models.json'
