@@ -66,7 +66,12 @@ if store_models_on_drive:
     setup.configure_model_cache(COMFY, PRIVATE / 'models')
 run(sys.executable, '-m', 'pip', 'install', '-r', COMFY / 'requirements.txt')
 ''')
-cell('code', '''# @title 2. 自動載入 Drive 提示庫、工作流與模型
+cell('markdown', '''## 2. 載入 Drive 並自動啟動 ComfyUI + Cloudflare Tunnel
+執行下方儲存格會先載入提示庫、工作流及模型，接著安裝 cloudflared、啟動 ComfyUI 與公開 Tunnel。
+等到出現 `COMFYUI_URL: https://….trycloudflare.com` 與「開啟 ComfyUI（Cloudflare Tunnel）」連結，即可直接進入。
+如果仍在模型檢查／下載階段，Tunnel 尚未啟動；不需要點連結才啟動伺服器。
+''')
+cell('code', '''# @title 2. 載入 Drive + 啟動 ComfyUI 與 Cloudflare Tunnel
 setup.install(COMFY, preserve_existing=True, seed_examples=False)
 def load_database(database):
     try:
@@ -107,7 +112,7 @@ if not shutil.which('cloudflared'):
 resume = module('resume_test')
 url = resume.main(verify_sample=False, output_directory=PRIVATE / 'output')
 import html
-display(HTML('<a target="_blank" href="' + html.escape(url, quote=True) + '">開啟 ComfyUI</a>'))
+display(HTML('<a target="_blank" href="' + html.escape(url, quote=True) + '">開啟 ComfyUI（Cloudflare Tunnel）</a>'))
 print('首次請選工作流程 → PromptDB-Drive → Krea2_PromptDB_Quick_Test，再按執行。')
 ''')
 notebook = {'nbformat': 4, 'nbformat_minor': 5, 'metadata': {'accelerator': 'GPU', 'colab': {'gpuType': 'T4', 'provenance': []}, 'kernelspec': {'name': 'python3', 'display_name': 'Python 3'}, 'language_info': {'name': 'python'}}, 'cells': cells}
