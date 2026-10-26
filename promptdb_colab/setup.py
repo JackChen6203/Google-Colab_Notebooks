@@ -131,8 +131,10 @@ def download_models(comfy, manifest):
                     h.update(block)
             return h.hexdigest()
         if dst.exists():
+            print(f'Checking existing model SHA256: {dst.name} ({dst.stat().st_size / 1e9:.2f} GB); reading Drive may take several minutes.', flush=True)
             if digest(dst) != expected:
                 raise ValueError(f"Existing model checksum mismatch: {dst}")
+            print(f'Verified existing model: {dst.name}; no download needed.', flush=True)
             continue
         dst.parent.mkdir(parents=True, exist_ok=True)
         print(f'Downloading and verifying model: {entry["path"]}', flush=True)
@@ -153,6 +155,7 @@ def import_workflows(comfy, source):
     """Copy selected UI workflows to the menu without changing their node data."""
     target = Path(comfy) / 'user/default/workflows/PromptDB-Drive'
     for path in sorted(Path(source).glob('*.json')):
+        print(f'Loading Drive workflow: {path.name}', flush=True)
         workflow = json.loads(path.read_text(encoding='utf-8-sig'))
         if not isinstance(workflow, dict) or not isinstance(workflow.get('nodes'), list):
             raise ValueError(f'Expected a ComfyUI UI workflow: {path}')

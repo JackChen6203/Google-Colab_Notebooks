@@ -76,8 +76,10 @@ def load_database(database, candidates, example):
 load_database('krea2', ['prompt_defalut.json', 'prompts_krea2.json'], 'prompts_krea2.json')
 load_database('illustrious', ['illustrious/prompts.json', 'prompts.json'], 'prompts.json')
 setup.configure_web_navigation(COMFY)
+print('Loading Drive workflows...', flush=True)
 setup.import_workflows(COMFY, PRIVATE / 'workflows')
 if download_krea2_models:
+    print('Checking/downloading the three Krea2 model files...', flush=True)
     setup.download_models(COMFY, REPO / 'promptdb_colab/models.krea2.json')
 print('Model directory:', (COMFY / 'models').resolve())
 for model in sorted((PRIVATE / 'models').rglob('*.safetensors')):
