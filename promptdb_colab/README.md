@@ -9,6 +9,15 @@
 提示格式是分類 → 提示名稱 → 字串。覆蓋同名檔案前會備份，資料庫連結到 Drive，因此節點儲存修改也會保留。
 執行「全部執行」後，在最後一格點「開啟 ComfyUI」。Drive 授權須由使用者自行完成。
 本次單一 notebook 的語法、整合與上傳備份檢查通過；Drive 授權及新 notebook 全程重跑尚未驗證。
+
+雙資料庫：`upload_prompt` 上傳 Krea2；`upload_illustrious_prompt` 上傳 Illustrious。
+Illustrious 選擇記錄保存在 `active_prompt_illustrious.json`，Krea2 沿用 `active_prompt.json`；兩者獨立自動載入。
+ComfyUI 的 PromptDB `database` 下拉選單可切換 `krea2`／`illustrious`。
+`upload_workflows` 可批次上傳一般用途工作流，保存在 Drive `workflows/`，之後自動出現在工作流程選單。
+`upload_illustrious_checkpoint` 可上傳 safetensors 到 Drive `models/checkpoints/`。
+約 7GB 的 checkpoint 建議直接用 Drive 網站上傳到相同目錄，再啟動 notebook，避免 Colab 上傳元件佔用 RAM。
+附帶 `Illustrious_PromptDB_Example.json`，引用本地一般模型檔名 `WAI-illustrious-SDXL_17.safetensors`。
+此權重尚未搬上 Drive；新增 Illustrious 工作流尚未實際出圖驗證。
 `ComfyUI/` 底下全部 17 份 notebooks 也已加入相同整合；各自保留其原有功能，
 不代表原本沒有 Manager 的 notebook 會額外安裝 Manager。
 
