@@ -18,16 +18,21 @@ import subprocess as _promptdb_subprocess
 import importlib.util as _promptdb_importlib
 
 def _promptdb_helper():
+    if '_promptdb_loaded_helper' in globals():
+        return globals()['_promptdb_loaded_helper']
     repository = _PromptDBPath('/content/Google-Colab_Notebooks')
     if not repository.exists():
         _promptdb_subprocess.run([
             'git', 'clone', '--branch', 'codex/colab-promptdb', '--single-branch',
             'https://github.com/JackChen6203/Google-Colab_Notebooks.git', str(repository)
         ], check=True)
+    else:
+        _promptdb_subprocess.run(['git', '-C', str(repository), 'pull', '--ff-only'], check=True)
     spec = _promptdb_importlib.spec_from_file_location(
         'colab_promptdb_setup', repository / 'promptdb_colab/setup.py')
     helper = _promptdb_importlib.module_from_spec(spec)
     spec.loader.exec_module(helper)
+    globals()['_promptdb_loaded_helper'] = helper
     return helper
 
 def configure_colab_model_storage():
