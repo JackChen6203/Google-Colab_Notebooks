@@ -20,7 +20,13 @@ Z-Image 原本使用直接出圖介面而非 ComfyUI 網頁；保留此介面，
 工作流放在同一個 Drive 資料夾的 `workflows/`；啟動前會匯入
 `ComfyUI/user/default/workflows/PromptDB-Drive/`，用 ComfyUI 的 Open 選擇載入。
 既有同名但不同內容的工作流不會被覆寫。
-只有 PromptDB 節點已打包；PromptStack、角色抽選與其他自訂節點需要另外處理。
+已附 PromptDB、Krea2CastPick 與四輸入的 TextJoinV2 相容節點；其餘模型／取樣／預覽節點使用 ComfyUI 內建版本。
+角色抽選保留原解析及標記處理，群像預設描述與缺少角色時的替代文字改為一般用途。
+`examples/PROMPT.JSON` 是可下載的範例；實際載入檔名仍為 `prompts.json` 和 `prompts_krea2.json`。
+`examples/workflows/Krea2_PromptDB_Example.json` 保留原 `Krea2_Neutrino_PromptDB.json`
+全部 37 個節點、節點 ID、輸入輸出與連線，只更換提示、說明及輸出檔名前綴。
+安裝時會自動將此範例放進 `workflows/PromptDB-Drive/`。
+範例沿用原本的模型檔名；模型尚未隨範例上傳或下載，開啟介面不代表可以使用該模型出圖。
 在畫面上重新選擇資料庫、分類與提示，將 STRING 接到文字編碼器。
 
 ## 模型與節點
@@ -48,7 +54,7 @@ ComfyUI 節點套件，因此在沒有 ComfyUI Python 環境時應使用此直�
 
 ## 來源與授權
 
-`node/prompt_db.py`、`node/web/prompt_db.js`、`node/web/prompt_db.css` 來自本機修改版
+`node/prompt_db.py`、`node/cast_compat.py`、`node/web/prompt_db.js`、`node/web/prompt_db.css` 來自本機修改版
 [benstaniford/comfy-prompt-db](https://github.com/benstaniford/comfy-prompt-db)。
-保留原始 GPL 授權於 `node/LICENSE`。`node/__init__.py` 改為只註冊通用 PromptDB。
+保留原始 GPL 授權於 `node/LICENSE`。`node/__init__.py` 註冊上述三個通用／相容節點。
 安裝腳本、notebook 與此整合目錄中的新增程式亦採用同一 GPL 授權。

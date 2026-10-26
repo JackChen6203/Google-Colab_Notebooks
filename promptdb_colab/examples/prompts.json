@@ -1,5 +1,42 @@
 {
   "風格": {
-    "自然攝影": "A tranquil mountain lake at sunrise, soft natural light, realistic landscape photography."
+    "Natural photography": "Natural daylight, realistic editorial travel photography.",
+    "Skip": "SKIP"
+  },
+  "動作": {
+    "Walking": "An adult traveler walking along a quiet garden path."
+  },
+  "鞋子": {
+    "Sneakers": "Comfortable plain canvas sneakers."
+  },
+  "服裝": {
+    "Everyday outfit": "A blue cotton jacket and relaxed beige trousers."
+  },
+  "身材": {
+    "Natural proportions": "An adult with natural body proportions."
+  },
+  "表情": {
+    "Smile": "A relaxed, friendly smile."
+  },
+  "外觀": {
+    "Neat appearance": "Neatly styled hair and a clean everyday appearance."
+  },
+  "角色": {
+    "Adult traveler": "An adult traveler, 30 years old, with short dark hair."
+  },
+  "負面": {
+    "Skip": "SKIP"
+  },
+  "超細跟超高跟鞋－底色": {
+    "Skip": "SKIP"
+  },
+  "超細跟超高跟鞋－顏色": {
+    "Skip": "SKIP"
+  },
+  "超細跟超高跟鞋－鞋頭": {
+    "Skip": "SKIP"
+  },
+  "超細跟超高跟鞋－材質": {
+    "Skip": "SKIP"
   }
 }

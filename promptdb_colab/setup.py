@@ -31,7 +31,12 @@ def install(comfy, data=None):
     if not (comfy / "main.py").is_file():
         raise ValueError("Not a ComfyUI installation")
     source = Path(__file__).parent / "node"
-    shutil.copytree(source, comfy / "custom_nodes" / "colab_promptdb", dirs_exist_ok=True)
+    node_target = comfy / "custom_nodes" / "colab_promptdb"
+    node_target.mkdir(parents=True, exist_ok=True)
+    # Only ship reviewed runtime files, not incidental local edits or caches.
+    for name in ("__init__.py", "prompt_db.py", "cast_compat.py", "text_join.py", "LICENSE"):
+        shutil.copyfile(source / name, node_target / name)
+    shutil.copytree(source / "web", node_target / "web", dirs_exist_ok=True)
     target = comfy / "user" / "default" / "user-db"
     target.mkdir(parents=True, exist_ok=True)
     for name in ("prompts.json", "prompts_krea2.json"):
@@ -43,6 +48,7 @@ def install(comfy, data=None):
         if dst.exists() and dst.read_bytes() != src.read_bytes():
             raise FileExistsError(f"Refusing to overwrite existing database: {dst}")
         shutil.copyfile(src, dst)
+    import_workflows(comfy, Path(__file__).parent / "examples/workflows")
 
 
 def download_models(comfy, manifest):
