@@ -29,7 +29,7 @@ def get_comfy_path():
         # Method 1: Use folder_paths.base_path if available
         if hasattr(folder_paths, 'base_path'):
             return folder_paths.base_path
-        
+
         # Method 2: Use checkpoints folder path
         checkpoint_paths = folder_paths.get_folder_paths("checkpoints")
         if checkpoint_paths:
@@ -37,7 +37,7 @@ def get_comfy_path():
             checkpoint_path = checkpoint_paths[0]
             if "models" in checkpoint_path:
                 return checkpoint_path.split("models")[0].rstrip(os.sep)
-        
+
         # Method 3: Use output folder path
         output_paths = folder_paths.get_folder_paths("output")
         if output_paths:
@@ -45,7 +45,7 @@ def get_comfy_path():
             output_path = output_paths[0]
             if "output" in output_path:
                 return output_path.split("output")[0].rstrip(os.sep)
-        
+
         # Method 4: Use current working directory as fallback
         return os.getcwd()
     except Exception as e:
@@ -111,7 +111,7 @@ class PromptDB:
         self.user_db_path = get_user_db_path()
         self.prompts_file = os.path.join(self.user_db_path, "prompts.json")
         self.ensure_prompts_file()
-    
+
     def ensure_prompts_file(self):
         """Create prompts.json file if it doesn't exist"""
         if not os.path.exists(self.prompts_file):
@@ -127,12 +127,12 @@ class PromptDB:
         # Load categories from the prompts file
         categories = []
         prompt_names = []
-        
+
         try:
             # Get the user database directory
             user_db_path = get_user_db_path()
             prompts_file = os.path.join(user_db_path, "prompts.json")
-            
+
             # Create file if it doesn't exist
             if not os.path.exists(prompts_file):
                 try:
@@ -141,7 +141,7 @@ class PromptDB:
                         json.dump(DEFAULT_PROMPTS, f, indent=2, ensure_ascii=False)
                 except Exception as e:
                     print(f"Error creating prompts.json: {e}")
-            
+
             # Category dropdown must include krea2-only categories such as 複合動作.
             # The database widget selects which file get_prompt reads.
             seen_categories = []
@@ -170,15 +170,15 @@ class PromptDB:
             # every prompt made 風格 show shoes, characters, and actions.
             first_category = categories[0] if categories else None
             prompt_names = list(merged.get(first_category, {}).keys()) if first_category else []
-                        
+
         except Exception as e:
             print(f"Error loading categories for INPUT_TYPES: {e}")
-        
+
         # Ensure we have at least one category
         if not categories:
             categories = ["default"]
             prompt_names = ["new prompt"]
-        
+
         # Ensure the default prompt is from the first category
         default_prompt = ""
         if categories and len(categories) > 0:
@@ -193,10 +193,10 @@ class PromptDB:
                             default_prompt = first_category_prompts[0]
             except Exception as e:
                 pass
-        
+
         if not default_prompt and prompt_names:
             default_prompt = prompt_names[0]
-        
+
         return {
             "required": {
                 "category": (categories, {"default": categories[0]}),
@@ -222,12 +222,12 @@ class PromptDB:
         if prompt_text:
             return True
         return f"unknown prompt {category}/{prompt_name}"
-    
+
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("prompt_text",)
     FUNCTION = "get_prompt"
     CATEGORY = "text"
-    
+
     def get_prompt(self, category="", prompt_name="", prompt_text="", database="illustrious", **kwargs):
         """Return prompt text from the selected database, falling back to the widget."""
 
@@ -279,7 +279,7 @@ async def load_categories(request):
         except Exception:
             data = {}
         prompts_file = get_prompts_file(data.get("database"))
-        
+
         prompts_db = {}
         if os.path.exists(prompts_file):
             try:
@@ -287,11 +287,11 @@ async def load_categories(request):
                     prompts_db = json.load(f)
             except (json.JSONDecodeError, Exception) as e:
                 print(f"Error loading prompts: {e}")
-        
+
         categories = list(prompts_db.keys()) if prompts_db else []
-        
+
         return web.json_response({"categories": categories})
-        
+
     except Exception as e:
         print(f"Error in load_categories: {e}")
         return web.json_response({"categories": []}, status=500)
@@ -303,12 +303,12 @@ async def load_prompts(request):
     try:
         data = await request.json()
         category = data.get("category", "")
-        
+
         if not category:
             return web.json_response({"prompts": []})
-        
+
         prompts_file = get_prompts_file(data.get("database"))
-        
+
         # Load prompts database
         prompts_db = {}
         if os.path.exists(prompts_file):
@@ -317,12 +317,12 @@ async def load_prompts(request):
                     prompts_db = json.load(f)
             except (json.JSONDecodeError, Exception) as e:
                 print(f"Error loading prompts.json: {e}")
-        
+
         category_prompts = prompts_db.get(category, {})
         prompt_names = list(category_prompts.keys()) if category_prompts else []
-        
+
         return web.json_response({"prompts": prompt_names})
-        
+
     except Exception as e:
         print(f"Error in load_prompts: {e}")
         return web.json_response({"prompts": []}, status=500)
@@ -335,12 +335,12 @@ async def load_prompt_text(request):
         data = await request.json()
         category = data.get("category", "")
         prompt_name = data.get("prompt_name", "")
-        
+
         if not category or not prompt_name:
             return web.json_response({"prompt_text": ""})
-        
+
         prompts_file = get_prompts_file(data.get("database"))
-        
+
         # Load prompts database
         prompts_db = {}
         if os.path.exists(prompts_file):
@@ -349,11 +349,11 @@ async def load_prompt_text(request):
                     prompts_db = json.load(f)
             except (json.JSONDecodeError, Exception) as e:
                 print(f"Error loading prompts.json: {e}")
-        
+
         prompt_text = prompts_db.get(category, {}).get(prompt_name, "")
-        
+
         return web.json_response({"prompt_text": prompt_text})
-        
+
     except Exception as e:
         print(f"Error in load_prompt_text: {e}")
         return web.json_response({"prompt_text": ""}, status=500)
@@ -367,12 +367,12 @@ async def save_prompt_text(request):
         category = data.get("category", "")
         prompt_name = data.get("prompt_name", "")
         prompt_text = data.get("prompt_text", "")
-        
+
         if not category or not prompt_name:
             return web.json_response({"success": False, "message": "Category and prompt name are required"})
-        
+
         prompts_file = get_prompts_file(data.get("database"))
-        
+
         # Load existing prompts database
         prompts_db = {}
         if os.path.exists(prompts_file):
@@ -381,26 +381,26 @@ async def save_prompt_text(request):
                     prompts_db = json.load(f)
             except (json.JSONDecodeError, Exception) as e:
                 print(f"Error loading prompts.json: {e}")
-        
+
         # Ensure category exists
         if category not in prompts_db:
             prompts_db[category] = {}
-        
+
         # Save the prompt text
         prompts_db[category][prompt_name] = prompt_text
-        
+
         # Save to file
         try:
             os.makedirs(os.path.dirname(prompts_file), exist_ok=True)
             with open(prompts_file, 'w', encoding='utf-8') as f:
                 json.dump(prompts_db, f, indent=2, ensure_ascii=False)
-            
+
             return web.json_response({"success": True, "message": f"Saved prompt '{prompt_name}'"})
-            
+
         except Exception as e:
             print(f"Error saving prompts.json: {e}")
             return web.json_response({"success": False, "message": f"Error saving: {e}"})
-        
+
     except Exception as e:
         print(f"Error in save_prompt_text: {e}")
         return web.json_response({"success": False, "message": f"Error: {e}"}, status=500)
@@ -413,12 +413,12 @@ async def create_new_prompt(request):
         data = await request.json()
         category = data.get("category", "")
         prompt_name = data.get("prompt_name", "")
-        
+
         if not category or not prompt_name:
             return web.json_response({"success": False, "message": "Category and prompt name are required"})
-        
+
         prompts_file = get_prompts_file(data.get("database"))
-        
+
         # Load existing prompts database
         prompts_db = {}
         if os.path.exists(prompts_file):
@@ -427,32 +427,32 @@ async def create_new_prompt(request):
                     prompts_db = json.load(f)
             except (json.JSONDecodeError, Exception) as e:
                 print(f"Error loading prompts.json: {e}")
-        
+
         # Ensure category exists (create if new, use existing if already exists)
         is_new_category = category not in prompts_db
         if category not in prompts_db:
             prompts_db[category] = {}
-        
+
         # Create new prompt with empty text
         prompts_db[category][prompt_name] = ""
-        
+
         # Save to file
         try:
             os.makedirs(os.path.dirname(prompts_file), exist_ok=True)
             with open(prompts_file, 'w', encoding='utf-8') as f:
                 json.dump(prompts_db, f, indent=2, ensure_ascii=False)
-            
+
             if is_new_category:
                 message = f"Created new category '{category}' and added prompt '{prompt_name}'"
             else:
                 message = f"Added prompt '{prompt_name}' to existing category '{category}'"
-            
+
             return web.json_response({"success": True, "message": message})
-            
+
         except Exception as e:
             print(f"Error saving prompts.json: {e}")
             return web.json_response({"success": False, "message": f"Error saving: {e}"})
-        
+
     except Exception as e:
         print(f"Error in create_new_prompt: {e}")
         return web.json_response({"success": False, "message": f"Error: {e}"}, status=500)

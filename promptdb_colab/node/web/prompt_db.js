@@ -4,21 +4,21 @@ import { api } from "../../scripts/api.js";
 // Extension for Prompt DB
 app.registerExtension({
     name: "PromptDB",
-    
+
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        
+
         if (nodeData.name === "PromptDB") {
             const onNodeCreated = nodeType.prototype.onNodeCreated;
-            
+
             nodeType.prototype.onNodeCreated = function() {
                 const r = onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
-                
+
                 // Find the input widgets
                 const categoryWidget = this.widgets?.find(w => w.name === "category");
                 const promptNameWidget = this.widgets?.find(w => w.name === "prompt_name");
                 const promptTextWidget = this.widgets?.find(w => w.name === "prompt_text");
                 const databaseWidget = this.widgets?.find(w => w.name === "database");
-                
+
                 if (categoryWidget && promptNameWidget && promptTextWidget) {
                     const getDatabase = () => databaseWidget?.value || "illustrious";
                     let categoryRequestId = 0;
@@ -49,7 +49,7 @@ app.registerExtension({
                         const inputValue = promptTextWidget.inputEl?.value;
                         return typeof inputValue === "string" ? inputValue : (promptTextWidget.value || "");
                     };
-                    
+
                     // Function to load prompts for a category
                     const loadPrompts = async (category, preserveCurrentSelection = false, desiredPromptName = null, preservePromptText = false) => {
                         const requestId = ++promptListRequestId;
@@ -70,7 +70,7 @@ app.registerExtension({
                                     database
                                 })
                             });
-                            
+
                             if (response.ok) {
                                 const data = await response.json();
                                 if (requestId !== promptListRequestId ||
@@ -78,7 +78,7 @@ app.registerExtension({
                                     categoryWidget.value !== category) {
                                     return;
                                 }
-                                
+
                                 // Update the prompt name dropdown values
                                 if (data.prompts && data.prompts.length > 0) {
                                     // Own array per node. The server combo is shared across
@@ -86,14 +86,14 @@ app.registerExtension({
                                     // keeps 風格 from listing every other category.
                                     const own = data.prompts.slice();
                                     promptNameWidget.options.values = own;
-                                    
+
                                     // Use desiredPromptName if provided, otherwise preserve current selection
                                     let targetPrompt = targetSelection;
                                     if (!data.prompts.includes(targetPrompt)) {
                                         targetPrompt = data.prompts[0];
                                     }
                                     promptNameWidget.value = targetPrompt;
-                                    
+
                                     // If widget has an input element, update it
                                     if (promptNameWidget.inputEl) {
                                         promptNameWidget.inputEl.innerHTML = "";
@@ -111,7 +111,7 @@ app.registerExtension({
                                     promptNameWidget.disabled = false;
                                     if (promptNameWidget.inputEl) promptNameWidget.inputEl.disabled = false;
                                     nodeInstance.setDirtyCanvas(true, true);
-                                    
+
                                     // Load text for the current prompt (not necessarily the first one)
                                     if (!preservePromptText && currentPromptText() === promptTextAtRequestStart) {
                                         await loadPromptText(category, promptNameWidget.value);
@@ -132,7 +132,7 @@ app.registerExtension({
                             console.error("Error loading prompts:", error);
                         }
                     };
-                    
+
                     // Function to load prompt text
                     const loadPromptText = async (category, promptName) => {
                         const requestId = ++promptTextRequestId;
@@ -150,7 +150,7 @@ app.registerExtension({
                                     database
                                 })
                             });
-                            
+
                             if (response.ok) {
                                 const data = await response.json();
                                 if (requestId !== promptTextRequestId ||
@@ -160,19 +160,19 @@ app.registerExtension({
                                     currentPromptText() !== promptTextAtRequestStart) {
                                     return;
                                 }
-                                
+
                                 promptTextWidget.value = data.prompt_text || "";
-                                
+
                                 // Update the text area DOM element if it exists
                                 if (promptTextWidget.inputEl) {
                                     promptTextWidget.inputEl.value = data.prompt_text || "";
                                 }
-                                
+
                                 // Trigger the callback to update the node
                                 if (promptTextWidget.callback) {
                                     promptTextWidget.callback(data.prompt_text || "");
                                 }
-                                
+
                                 // Force canvas redraw to show changes
                                 nodeInstance.setDirtyCanvas(true, true);
                             }
@@ -180,11 +180,11 @@ app.registerExtension({
                             console.error("Error loading prompt text:", error);
                         }
                     };
-                    
+
                     // Store original callbacks
                     const originalCategoryCallback = categoryWidget.callback;
                     const originalPromptNameCallback = promptNameWidget.callback;
-                    
+
                     // Store reference to the node instance
                     const nodeInstance = this;
                     let saveButton = null;
@@ -230,7 +230,7 @@ app.registerExtension({
                             saveButton.computeSize = () => [110, 22];
                         }
                     };
-                    
+
                     // Keep prompt_text widget visible for manual editing and inspection
                     promptTextWidget.hidden = false;
                     setWidgetCompactSize(promptTextWidget, 72);
@@ -309,7 +309,7 @@ app.registerExtension({
                             loadPrompts(value);
                         }
                     };
-                    
+
                     // Override prompt name widget callback
                     promptNameWidget.callback = function(value) {
                         if (!promptListReady || loadedDatabase !== getDatabase() ||
@@ -324,7 +324,7 @@ app.registerExtension({
                     };
                     setWidgetCompactSize(categoryWidget, 22);
                     setWidgetCompactSize(promptNameWidget, 22);
-                    
+
                     // Defer until synchronous workflow restoration has finished. Only one
                     // initialization is allowed, whether this is a new or restored node.
                     const scheduleInitialization = (restoredPromptName = null, restoredPromptText = currentPromptText()) => {
@@ -342,10 +342,10 @@ app.registerExtension({
                         }, 0);
                     };
                     scheduleInitialization();
-                    
+
                     // Let ComfyUI handle widget serialization naturally
                     this.serialize_widgets = true;
-                    
+
                     // Override onConfigure to handle prompt text loading after widget restoration
                     const originalOnConfigure = this.onConfigure;
                     this.onConfigure = function(info) {
@@ -363,7 +363,7 @@ app.registerExtension({
                         applyCompactLayout();
                         this.setDirtyCanvas(true, true);
                     };
-                    
+
                     // Force the node to resize to show the new buttons
                     this.computeSize();
                     applyCompactLayout();
@@ -371,7 +371,7 @@ app.registerExtension({
                 } else {
                     // Could not find required widgets
                 }
-                
+
                 return r;
             };
         }
