@@ -82,7 +82,7 @@ def configure_model_cache(comfy, cache):
         raise
 
 
-def install(comfy, data=None, preserve_existing=False):
+def install(comfy, data=None, preserve_existing=False, seed_examples=True):
     comfy = Path(comfy)
     if not (comfy / "main.py").is_file():
         raise ValueError("Not a ComfyUI installation")
@@ -96,6 +96,8 @@ def install(comfy, data=None, preserve_existing=False):
     target = comfy / "user" / "default" / "user-db"
     target.mkdir(parents=True, exist_ok=True)
     for name in ("prompts.json", "prompts_krea2.json"):
+        if data is None and not seed_examples:
+            continue
         src = Path(data) / name if data else Path(__file__).parent / "examples" / name
         if not src.is_file():
             continue

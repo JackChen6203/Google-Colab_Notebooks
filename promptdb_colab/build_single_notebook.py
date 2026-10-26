@@ -16,7 +16,7 @@ def cell(kind, source):
 
 cell('markdown', '''# Krea2 PromptDB — Google Drive + Cloudflare
 依序執行，或選「全部執行」。首次 Google Drive 掛載須自行授權。
-預設從 Drive 自動載入 `prompt_defalut.json`；首次沒有檔案時使用一般旅拍範例。
+直接載入 Drive 已有 JSON；Krea2 優先 prompts_krea2.json，Illustrious 優先 prompts.json。不生成提示庫檔案。
 提示庫、工作流與自行上傳的模型一律從 Drive 讀取，不會跳出選檔視窗。
 Cloudflare 連結公開此 runtime 的 ComfyUI；停止 runtime 後網址失效。
 ''')
@@ -50,10 +50,6 @@ def module(name):
     return result
 setup = module('setup')
 store = module('prompt_store')
-for filename in ('prompts.json', 'prompts_krea2.json'):
-    destination = PRIVATE / 'user-db' / filename
-    if not destination.exists():
-        store.save_upload(destination.parent, filename, (REPO / 'promptdb_colab/examples' / filename).read_bytes())
 for example in (REPO / 'promptdb_colab/examples/workflows').glob('*.json'):
     destination = PRIVATE / 'workflows' / example.name
     if not destination.exists():
@@ -64,17 +60,16 @@ if store_models_on_drive:
 run(sys.executable, '-m', 'pip', 'install', '-r', COMFY / 'requirements.txt')
 ''')
 cell('code', '''# @title 2. 自動載入 Drive 提示庫、工作流與模型
-setup.install(COMFY, preserve_existing=True)
-def load_database(database, candidates, example):
-    paths = [PRIVATE / 'user-db' / filename for filename in candidates]
-    selected = next((path for path in paths if path.is_file()), None)
+setup.install(COMFY, preserve_existing=True, seed_examples=False)
+def load_database(database):
+    selected = store.select_existing(PRIVATE / 'user-db', database)
     if selected is None:
-        selected = paths[0]
-        store.save_upload(selected.parent, selected.name, (REPO / 'promptdb_colab/examples' / example).read_bytes())
+        print(database, 'No Drive JSON found; no file created.', flush=True)
+        return
     store.activate(COMFY, selected, database)
-    print(database, 'Drive database:', selected)
-load_database('krea2', ['prompt_defalut.json', 'prompts_krea2.json'], 'prompts_krea2.json')
-load_database('illustrious', ['illustrious/prompts.json', 'prompts.json'], 'prompts.json')
+    print(database, 'Drive database:', selected, selected.stat().st_size, 'bytes', flush=True)
+load_database('krea2')
+load_database('illustrious')
 setup.configure_web_navigation(COMFY)
 print('Loading Drive workflows...', flush=True)
 setup.import_workflows(COMFY, PRIVATE / 'workflows')
@@ -85,8 +80,7 @@ print('Model directory:', (COMFY / 'models').resolve())
 for model in sorted((PRIVATE / 'models').rglob('*.safetensors')):
     print('Available Drive model:', model.relative_to(PRIVATE), model.stat().st_size, 'bytes')
 print('Workflow: PromptDB-Drive/Krea2_PromptDB_Quick_Test')
-''')
-cell('code', '''# @title 3. 啟動 ComfyUI 與 Cloudflare Tunnel
+print('Starting ComfyUI server and Cloudflare automatically...', flush=True)
 import shutil, urllib.request, runpy
 from IPython.display import display, HTML
 if not shutil.which('cloudflared'):

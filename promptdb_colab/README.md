@@ -1,5 +1,10 @@
 # PromptDB on Colab
 
+最新啟動規則：Drive `user-db/prompts_krea2.json`、`user-db/prompts.json` 優先於舊 default／子目錄範例。
+沒有標準檔名時會選既有有效 JSON；不新增任何 Drive 提示庫檔案，也不覆寫既有檔案。
+載入時印出實際路徑與大小。舊 `prompt_defalut.json` 不會刪除，但不再蓋過 `prompts_krea2.json`。
+第二格已合併啟動 server／Tunnel，準備完成後自動啟動並驗證連線；點「開啟 ComfyUI」只開網頁。
+
 生成圖片：主 notebook 使用 `--output-directory` 將 SaveImage 輸出直接設定為
 `MyDrive/ComfyUI-PromptDB/output/`（跟隨 `drive_folder`）。第三格會印出實際路徑。
 首次切換會重啟 ComfyUI，並複製 `/content/ComfyUI/output/` 既有檔案到 Drive；

@@ -50,6 +50,10 @@ class IntegrationTests(unittest.TestCase):
         self.assertNotIn('files.upload', code)
         self.assertNotIn('upload_prompt =', code)
         self.assertIn("output_directory=PRIVATE / 'output'", code)
+        self.assertNotIn('store.save_upload', code)
+        startup_cells = [c for c in root['cells'] if 'resume.main(' in ''.join(c['source'])]
+        self.assertEqual(len(startup_cells), 1)
+        self.assertIn('load_database', ''.join(startup_cells[0]['source']))
         for cell in root['cells']:
             if cell['cell_type'] == 'code':
                 compile(''.join(cell['source']), '<single notebook>', 'exec')

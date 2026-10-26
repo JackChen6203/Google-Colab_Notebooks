@@ -7,6 +7,33 @@ from pathlib import Path
 DATABASE_FILES = {'krea2': 'prompts_krea2.json', 'illustrious': 'prompts.json'}
 
 
+def select_existing(folder, database):
+    """Select user data without creating or modifying a Drive file."""
+    folder = Path(folder)
+    preferred = {
+        'krea2': ['prompts_krea2.json', 'krea2/prompts_krea2.json', 'prompt_defalut.json', 'prompt_default.json'],
+        'illustrious': ['prompts.json', 'illustrious/prompts.json'],
+    }
+    if database not in preferred:
+        raise ValueError('Unknown database')
+    for name in preferred[database]:
+        candidate = folder / name
+        if candidate.is_file():
+            decode(candidate.read_bytes())
+            return candidate
+    candidates = sorted((folder / database).glob('*.json'))
+    if database == 'krea2':
+        reserved = {'prompts.json', 'active_prompt.json', 'active_prompt_illustrious.json', 'active_prompt_krea2.json'}
+        candidates += [p for p in sorted(folder.glob('*.json')) if p.name not in reserved]
+    for candidate in candidates:
+        try:
+            decode(candidate.read_bytes())
+        except (ValueError, UnicodeError):
+            continue
+        return candidate
+    return None
+
+
 def decode(data):
     value = json.loads(data.decode('utf-8-sig'))
     if not isinstance(value, dict) or not value or not all(

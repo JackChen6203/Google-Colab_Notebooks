@@ -18,7 +18,7 @@ def main(verify_sample=True, output_directory=None):
     spec = importlib.util.spec_from_file_location('resume_promptdb_setup', root / 'setup.py')
     helper = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(helper)
-    helper.install(comfy, preserve_existing=True)
+    helper.install(comfy, preserve_existing=True, seed_examples=verify_sample)
     changed = helper.configure_web_navigation(comfy)
     output_args = []
     if output_directory is not None:
