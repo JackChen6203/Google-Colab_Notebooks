@@ -16,6 +16,8 @@ def cell(kind, source):
 
 cell('markdown', '''# Krea2 PromptDB — Google Drive + Cloudflare
 依序執行，或選「全部執行」。首次 Google Drive 掛載須自行授權。
+所有安裝、模型檢查、ComfyUI 啟動與 Cloudflare 連線檢查都在 Colab 虛擬機執行，無須在電腦執行程式。
+同一 runtime 已掛載 Drive 時直接沿用；新 runtime 可能需要 Google 再次授權，Notebook 無法保證永久免授權。
 直接載入 Drive 已有 JSON；Krea2 優先 prompts_krea2.json，Illustrious 優先 prompts.json。不生成提示庫檔案。
 提示庫、工作流與自行上傳的模型一律從 Drive 讀取，不會跳出選檔視窗。
 Cloudflare 連結公開此 runtime 的 ComfyUI；停止 runtime 後網址失效。
@@ -27,7 +29,12 @@ drive_folder = "/content/drive/MyDrive/ComfyUI-PromptDB" # @param {type:"string"
 from pathlib import Path
 import subprocess, sys, importlib.util, json
 from google.colab import drive
-drive.mount('/content/drive')
+import os
+if os.path.ismount('/content/drive') and Path('/content/drive/MyDrive').is_dir():
+    print('沿用目前 runtime 已掛載的 Google Drive。', flush=True)
+else:
+    print('正在掛載 Google Drive；新 runtime 可能需要您同意 Google 授權。', flush=True)
+    drive.mount('/content/drive', force_remount=False)
 PRIVATE = Path(drive_folder)
 PRIVATE.mkdir(parents=True, exist_ok=True)
 for relative in ('output', 'models/checkpoints', 'models/diffusion_models', 'models/text_encoders', 'models/vae', 'models/loras', 'workflows', 'user-db/illustrious'):
