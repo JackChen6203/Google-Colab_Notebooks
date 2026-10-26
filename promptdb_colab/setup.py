@@ -111,6 +111,7 @@ def download_models(comfy, manifest):
                 raise ValueError(f"Existing model checksum mismatch: {dst}")
             continue
         dst.parent.mkdir(parents=True, exist_ok=True)
+        print(f'Downloading and verifying model: {entry["path"]}', flush=True)
         temporary = dst.with_name(dst.name + ".partial")
         try:
             with urllib.request.urlopen(url) as response, temporary.open("wb") as output:

@@ -11,6 +11,7 @@ STORAGE_HOOK = BEGIN + "configure_colab_model_storage()\n" + END + "\n"
 CONFIG = '''# @title PromptDB：安裝與私人 Drive 選項（先執行）
 promptdb_use_drive = False # @param {type:"boolean"}
 models_use_drive = False # @param {type:"boolean"}
+download_krea2_models = False # @param {type:"boolean"}
 promptdb_drive_folder = "/content/drive/MyDrive/ComfyUI-PromptDB" # @param {type:"string"}
 
 from pathlib import Path as _PromptDBPath
@@ -54,6 +55,8 @@ def install_colab_promptdb():
             raise FileNotFoundError(f'Create {data} and add prompt JSON files first')
     helper.install('/content/ComfyUI', data)
     helper.configure_web_navigation('/content/ComfyUI')
+    if download_krea2_models:
+        helper.download_models('/content/ComfyUI', _PromptDBPath('/content/Google-Colab_Notebooks/promptdb_colab/models.krea2.json'))
     if promptdb_use_drive:
         helper.import_workflows('/content/ComfyUI', _PromptDBPath(promptdb_drive_folder) / 'workflows')
         manifest = _PromptDBPath(promptdb_drive_folder) / 'models.json'
