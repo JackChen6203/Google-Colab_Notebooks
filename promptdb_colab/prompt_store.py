@@ -4,7 +4,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-DATABASE_FILES = {'krea2': 'prompts_krea2.json', 'illustrious': 'prompts.json'}
+DATABASE_FILES = {'krea2': 'prompts_krea2.json', 'illustrious': 'prompts.json', 'krea2-口交': 'prompts_krea2-口交.json', 'krea2-影片': 'prompts_krea2-影片.json'}
 
 
 def select_existing(folder, database):
@@ -13,6 +13,8 @@ def select_existing(folder, database):
     preferred = {
         'krea2': ['prompts_krea2.json', 'krea2/prompts_krea2.json', 'prompt_defalut.json', 'prompt_default.json'],
         'illustrious': ['prompts.json', 'illustrious/prompts.json'],
+        'krea2-口交': ['prompts_krea2-口交.json', 'krea2/prompts_krea2-口交.json'],
+        'krea2-影片': ['prompts_krea2-影片.json', 'krea2/prompts_krea2-影片.json'],
     }
     if database not in preferred:
         raise ValueError('Unknown database')

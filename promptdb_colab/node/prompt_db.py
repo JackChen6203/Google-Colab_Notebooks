@@ -87,6 +87,8 @@ def get_user_db_path():
 DB_FILES = {
     "illustrious": "prompts.json",
     "krea2": "prompts_krea2.json",
+    "krea2-口交": "prompts_krea2-口交.json",
+    "krea2-影片": "prompts_krea2-影片.json",
 }
 
 
