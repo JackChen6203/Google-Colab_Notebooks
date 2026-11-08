@@ -19,7 +19,7 @@ WIDGETS = {
 }
 
 
-def prepare(workflow, size=256, steps=2):
+def prepare(workflow, size=256, steps=2, width=None, height=None):
     workflow = copy.deepcopy(workflow)
     nodes = {node['id']: node for node in workflow['nodes']}
     links = {link[0]: link for link in workflow['links']}
@@ -51,8 +51,8 @@ def prepare(workflow, size=256, steps=2):
             node['widgets_values'][1] = 'fixed'
             node['widgets_values'][2] = steps
         elif kind == 'EmptyLatentImage':
-            inputs.update(width=size, height=size, batch_size=1)
-            node['widgets_values'][:3] = [size, size, 1]
+            inputs.update(width=width or size, height=height or size, batch_size=1)
+            node['widgets_values'][:3] = [inputs['width'], inputs['height'], 1]
         elif kind == 'SaveImage':
             inputs['filename_prefix'] = 'Krea2_PromptDB_Colab_Acceptance'
             node['widgets_values'] = [inputs['filename_prefix']]
@@ -82,9 +82,11 @@ if __name__ == '__main__':
     parser.add_argument('--endpoint', default='http://127.0.0.1:8188')
     parser.add_argument('--size', type=int, default=256)
     parser.add_argument('--steps', type=int, default=2)
+    parser.add_argument('--width', type=int)
+    parser.add_argument('--height', type=int)
     args = parser.parse_args()
     workflow = json.loads((Path(__file__).parent / 'examples/workflows/Krea2_PromptDB_Example.json').read_text(encoding='utf-8'))
-    prompt, workflow = prepare(workflow, args.size, args.steps)
+    prompt, workflow = prepare(workflow, args.size, args.steps, args.width, args.height)
     result = request(args.endpoint, '/prompt', {'prompt': prompt, 'extra_data': {'extra_pnginfo': {'workflow': workflow}}})
     if result.get('node_errors'):
         raise RuntimeError(json.dumps(result['node_errors'], ensure_ascii=False, indent=2))
