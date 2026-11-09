@@ -1,0 +1,15 @@
+{
+  "id": "davis1233798/comfyui-promptdb-kaggle",
+  "title": "ComfyUI PromptDB Kaggle",
+  "code_file": "ComfyUI_PromptDB_Kaggle.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "true",
+  "enable_gpu": "true",
+  "enable_internet": "true",
+  "machine_shape": "NvidiaL4",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

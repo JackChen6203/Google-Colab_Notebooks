@@ -1,0 +1,75 @@
+name: Deploy ComfyUI PromptDB to Kaggle
+
+on:
+  push:
+    branches:
+      - codex/kaggle-promptdb
+    paths:
+      - "kaggle/promptdb/**"
+      - "promptdb_colab/**"
+      - ".github/workflows/deploy-kaggle-promptdb.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kaggle-comfyui-promptdb
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+      KAGGLE_KERNEL: davis1233798/comfyui-promptdb-kaggle
+    steps:
+      - name: Check out the deployment branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Kaggle CLI
+        run: python -m pip install --upgrade kaggle
+
+      - name: Verify deployment credential is configured
+        shell: bash
+        run: |
+          if [[ -z "${KAGGLE_API_TOKEN:-}" ]]; then
+            echo "KAGGLE_API_TOKEN repository secret is missing. Add it in Settings > Secrets and variables > Actions." >&2
+            exit 1
+          fi
+          echo "Kaggle deployment secret is present; its value is not printed."
+
+      - name: Push notebook and start Kaggle execution
+        run: kaggle kernels push --path kaggle/promptdb --accelerator NvidiaL4 --timeout 43200
+
+      - name: Collect Kaggle status and latest execution logs
+        shell: bash
+        run: |
+          status=""
+          for attempt in {1..10}; do
+            status="$(kaggle kernels status "$KAGGLE_KERNEL" 2>&1)" || {
+              echo "$status"
+              exit 1
+            }
+            echo "$status"
+            if grep -Eiq 'complete|error|failed|cancel' <<<"$status"; then
+              break
+            fi
+            sleep 30
+          done
+
+          echo "Latest Kaggle notebook logs:"
+          kaggle kernels logs "$KAGGLE_KERNEL" || true
+
+          if grep -Eiq 'error|failed|cancel' <<<"$status"; then
+            exit 1
+          fi
+          if ! grep -Eiq 'complete|error|failed|cancel' <<<"$status"; then
+            echo "Kaggle execution is still running after five minutes; the notebook keeps its ComfyUI session active."
+          fi
