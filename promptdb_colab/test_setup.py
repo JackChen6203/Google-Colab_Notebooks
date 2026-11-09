@@ -84,19 +84,50 @@ class SetupTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 setup.validate_db(path)
 
-    def test_workflow_import_and_overwrite_protection(self):
+    def test_workflow_import_and_conflict_preservation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / 'private'
             source.mkdir()
             workflow = source / 'landscape.json'
             workflow.write_text('{"nodes": []}', encoding='utf-8')
-            setup.import_workflows(root / 'comfy', source)
             target = root / 'comfy/user/default/workflows/PromptDB-Drive/landscape.json'
-            self.assertEqual(target.read_bytes(), workflow.read_bytes())
+            target.parent.mkdir(parents=True)
+            original = b'{"nodes": [{"id":1}]}'
+            target.write_bytes(original)
+
+            setup.import_workflows(root / 'comfy', source)
+            drive_copy = target.with_name('landscape (Drive).json')
+            self.assertEqual(target.read_bytes(), original)
+            self.assertEqual(drive_copy.read_bytes(), workflow.read_bytes())
+
+            # Re-importing the same Drive file is idempotent and does not create copies.
+            setup.import_workflows(root / 'comfy', source)
+            self.assertEqual(target.read_bytes(), original)
+            self.assertEqual(drive_copy.read_bytes(), workflow.read_bytes())
+            self.assertFalse(target.with_name('landscape (Drive 2).json').exists())
+
+    def test_workflow_import_uses_next_name_when_drive_copy_conflicts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'private'
+            source.mkdir()
+            workflow = source / 'landscape.json'
+            workflow.write_text('{"nodes": []}', encoding='utf-8')
+            target = root / 'comfy/user/default/workflows/PromptDB-Drive/landscape.json'
+            target.parent.mkdir(parents=True)
             target.write_text('{"nodes": [{"id":1}]}', encoding='utf-8')
-            with self.assertRaises(FileExistsError):
-                setup.import_workflows(root / 'comfy', source)
+            drive_copy = target.with_name('landscape (Drive).json')
+            drive_copy.write_text('{"nodes": [{"id":2}]}', encoding='utf-8')
+
+            setup.import_workflows(root / 'comfy', source)
+
+            self.assertEqual(target.read_text(encoding='utf-8'), '{"nodes": [{"id":1}]}')
+            self.assertEqual(drive_copy.read_text(encoding='utf-8'), '{"nodes": [{"id":2}]}')
+            self.assertEqual(
+                target.with_name('landscape (Drive 2).json').read_bytes(),
+                workflow.read_bytes(),
+            )
 
     def test_model_cache_refuses_conflicting_drive_model(self):
         with tempfile.TemporaryDirectory() as directory:
