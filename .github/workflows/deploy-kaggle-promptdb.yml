@@ -46,7 +46,7 @@ jobs:
           echo "Kaggle deployment secret is present; its value is not printed."
 
       - name: Push notebook and start Kaggle execution
-        run: kaggle kernels push --path kaggle/promptdb --accelerator NvidiaL4 --timeout 43200
+        run: kaggle kernels push --path kaggle/promptdb --accelerator NvidiaTeslaT4 --timeout 43200
 
       - name: Collect Kaggle status and latest execution logs
         shell: bash
