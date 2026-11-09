@@ -186,7 +186,7 @@ def download_models(comfy, manifest, force_verify=False):
 
 
 def import_workflows(comfy, source):
-    """Copy selected UI workflows to the menu without changing their node data."""
+    """Copy selected UI workflows without replacing a different saved workflow."""
     target = Path(comfy) / 'user/default/workflows/PromptDB-Drive'
     for path in sorted(Path(source).glob('*.json')):
         print(f'Loading Drive workflow: {path.name}', flush=True)
@@ -195,9 +195,27 @@ def import_workflows(comfy, source):
             raise ValueError(f'Expected a ComfyUI UI workflow: {path}')
         target.mkdir(parents=True, exist_ok=True)
         dst = target / path.name
-        if dst.exists() and dst.read_bytes() != path.read_bytes():
-            raise FileExistsError(f'Refusing to overwrite workflow: {dst}')
-        shutil.copyfile(path, dst)
+        contents = path.read_bytes()
+        if dst.exists() and dst.read_bytes() != contents:
+            original = dst
+            suffix = 0
+            while True:
+                label = 'Drive' if suffix == 0 else f'Drive {suffix + 1}'
+                candidate = target / f'{path.stem} ({label}){path.suffix}'
+                if not candidate.exists():
+                    dst = candidate
+                    break
+                if candidate.read_bytes() == contents:
+                    dst = candidate
+                    break
+                suffix += 1
+            print(
+                f'Workflow name conflict: preserved {original.name}; '
+                f'Drive copy imported as {dst.name}.',
+                flush=True,
+            )
+        if not dst.exists():
+            shutil.copyfile(path, dst)
 
 
 def audit(comfy, workflows, endpoint):
