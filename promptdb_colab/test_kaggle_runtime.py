@@ -20,6 +20,20 @@ class NormalizeRcloneConfigTest(unittest.TestCase):
         self.assertIn("scope = drive", normalized)
         self.assertIn('"refresh_token":"example-refresh"', normalized)
 
+    def test_infers_missing_type_for_complete_drive_credentials(self):
+        normalized = normalize_rclone_config(config("gdrive").replace("type = drive\n", ""))
+        self.assertIn("type = drive", normalized)
+
+    def test_rejects_explicit_non_drive_type(self):
+        text = config("gdrive").replace("type = drive", "type = s3")
+        with self.assertRaisesRegex(ValueError, r"type=drive"):
+            normalize_rclone_config(text)
+
+    def test_rejects_missing_type_and_incomplete_credentials(self):
+        text = config("gdrive").replace("type = drive\n", "").replace("client_id = example.apps.googleusercontent.com\n", "")
+        with self.assertRaisesRegex(ValueError, r"type=drive"):
+            normalize_rclone_config(text)
+
     def test_renames_one_google_drive_remote_to_gdrive(self):
         normalized = normalize_rclone_config(config("GoogleDrive"))
         self.assertIn("[gdrive]", normalized)

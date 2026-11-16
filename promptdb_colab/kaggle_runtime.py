@@ -81,8 +81,19 @@ def normalize_rclone_config(config_text):
         if config.get(section, "type", fallback="").strip().lower() == "drive"
     ]
     if config.has_section(REMOTE_NAME):
-        if config.get(REMOTE_NAME, "type", fallback="").strip().lower() != "drive":
-            raise ValueError("The [gdrive] remote must use rclone type=drive.")
+        remote_type = config.get(REMOTE_NAME, "type", fallback="").strip().lower()
+        if not remote_type and all(
+            config.get(REMOTE_NAME, key, fallback="").strip()
+            for key in ("client_id", "client_secret", "token")
+        ):
+            # Some copied Drive configurations omit the backend declaration.
+            config.set(REMOTE_NAME, "type", "drive")
+        elif remote_type != "drive":
+            raise ValueError(
+                "The [gdrive] remote must use rclone type=drive. "
+                "Check the RCLONE_CONFIG_TEXT secret: include type = drive and "
+                "the Google Drive OAuth client_id, client_secret, and token."
+            )
     elif len(drive_sections) == 1:
         selected = drive_sections[0]
         values = dict(config.items(selected))
