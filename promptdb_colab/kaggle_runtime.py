@@ -8,6 +8,7 @@ normalized to the single name used by the notebook: ``gdrive:``.
 from __future__ import annotations
 
 import configparser
+import hashlib
 import html
 import importlib.util
 import json
@@ -385,7 +386,11 @@ def bootstrap(
         for existing in workflow_target.iterdir():
             destination = private / "workflows" / existing.name
             if destination.exists() and existing.is_file() and destination.read_bytes() != existing.read_bytes():
-                raise RuntimeError(f"Conflicting Drive workflow preserved: {existing.name}")
+                digest = hashlib.sha256(existing.read_bytes()).hexdigest()
+                destination = destination.with_name(f"{destination.stem}.local-{digest}{destination.suffix}")
+                if destination.exists() and destination.read_bytes() != existing.read_bytes():
+                    raise RuntimeError("Could not safely preserve a conflicting local workflow.")
+                print(f"Preserving conflicting local workflow as {destination.name}", flush=True)
             if existing.is_file() and not destination.exists():
                 shutil.copyfile(existing, destination)
         shutil.rmtree(workflow_target)
