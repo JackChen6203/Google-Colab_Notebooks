@@ -14,17 +14,14 @@ token = {{"access_token":"example-access","refresh_token":"example-refresh","tok
 
 
 class NormalizeRcloneConfigTest(unittest.TestCase):
-    def test_rejects_one_line_config_without_exposing_token(self):
+    def test_accepts_one_line_config(self):
         text = '[gdrive] type = drive scope = drive token = {"access_token":"private-value"}'
-        with self.assertRaisesRegex(ValueError, r"section header.*separate line") as error:
-            normalize_rclone_config(text)
-        self.assertNotIn("private-value", str(error.exception))
+        self.assertIn('token = {"access_token":"private-value"}', normalize_rclone_config(text))
 
-    def test_reports_both_missing_oauth_client_fields(self):
+    def test_accepts_default_rclone_oauth_client(self):
         text = config("gdrive").replace("client_id = example.apps.googleusercontent.com\n", "")
         text = text.replace("client_secret = example-client-secret\n", "")
-        with self.assertRaisesRegex(ValueError, r"client_id and client_secret"):
-            normalize_rclone_config(text)
+        self.assertIn("[gdrive]", normalize_rclone_config(text))
 
     def test_allows_section_header_comments(self):
         text = config("gdrive").replace("[gdrive]", "[gdrive] # comment")

@@ -69,6 +69,20 @@ def normalize_rclone_config(config_text):
     if len(config_text) > 1_000_000:
         raise ValueError("The rclone configuration is unexpectedly large.")
 
+    # Kaggle's secret editor can flatten a pasted config into a single line.
+    # Recover only an unambiguous Google Drive configuration with JSON token.
+    flattened = re.fullmatch(
+        r'\s*\[gdrive\]\s+type\s*=\s*drive\s+scope\s*=\s*drive\s+token\s*=\s*'
+        r'(?P<token>\{.*?\})\s*(?:team_drive\s*=\s*)?',
+        config_text, re.DOTALL | re.IGNORECASE,
+    )
+    if flattened:
+        try:
+            json.loads(flattened.group("token"))
+        except ValueError:
+            raise ValueError("The [gdrive] OAuth token is not valid JSON.") from None
+        config_text = "[gdrive]\ntype = drive\nscope = drive\ntoken = " + flattened.group("token") + "\n"
+
     # ConfigParser otherwise silently ignores settings following a section header.
     if any(re.match(r"^\s*\[[^]\n]+\]\s*(?![#;\s])\S", line)
            for line in config_text.splitlines()):
@@ -126,9 +140,9 @@ def normalize_rclone_config(config_text):
         key for key in ("client_id", "client_secret")
         if not config.get(REMOTE_NAME, key, fallback="").strip()
     ]
-    if missing_client_fields:
+    if len(missing_client_fields) == 1:
         raise ValueError(
-            "The [gdrive] remote needs a custom Google OAuth "
+            "The [gdrive] remote needs the matching custom Google OAuth "
             + " and ".join(missing_client_fields)
             + ". Add the credentials used to authorize this remote to the Kaggle Secret."
         )
