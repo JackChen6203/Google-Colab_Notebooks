@@ -69,6 +69,15 @@ def normalize_rclone_config(config_text):
     if len(config_text) > 1_000_000:
         raise ValueError("The rclone configuration is unexpectedly large.")
 
+    # ConfigParser otherwise silently ignores settings following a section header.
+    if any(re.match(r"^\s*\[[^]\n]+\]\s*(?![#;\s])\S", line)
+           for line in config_text.splitlines()):
+        raise ValueError(
+            "The rclone config has text after a section header. Put [gdrive] "
+            "on its own line and each setting on a separate line; keep the "
+            "token JSON on one line. Update the Kaggle Secret and retry."
+        )
+
     config = configparser.ConfigParser(interpolation=None)
     try:
         config.read_string(config_text)
@@ -113,10 +122,16 @@ def normalize_rclone_config(config_text):
         )
     if not config.has_option(REMOTE_NAME, "token"):
         raise ValueError("The [gdrive] remote is missing its OAuth token configuration.")
-    if not config.get(REMOTE_NAME, "client_id", fallback="").strip():
-        raise ValueError("The [gdrive] remote needs a custom Google OAuth client_id.")
-    if not config.get(REMOTE_NAME, "client_secret", fallback="").strip():
-        raise ValueError("The [gdrive] remote needs a custom Google OAuth client_secret.")
+    missing_client_fields = [
+        key for key in ("client_id", "client_secret")
+        if not config.get(REMOTE_NAME, key, fallback="").strip()
+    ]
+    if missing_client_fields:
+        raise ValueError(
+            "The [gdrive] remote needs a custom Google OAuth "
+            + " and ".join(missing_client_fields)
+            + ". Add the credentials used to authorize this remote to the Kaggle Secret."
+        )
 
     token_text = config.get(REMOTE_NAME, "token", fallback="")
     try:

@@ -14,6 +14,22 @@ token = {{"access_token":"example-access","refresh_token":"example-refresh","tok
 
 
 class NormalizeRcloneConfigTest(unittest.TestCase):
+    def test_rejects_one_line_config_without_exposing_token(self):
+        text = '[gdrive] type = drive scope = drive token = {"access_token":"private-value"}'
+        with self.assertRaisesRegex(ValueError, r"section header.*separate line") as error:
+            normalize_rclone_config(text)
+        self.assertNotIn("private-value", str(error.exception))
+
+    def test_reports_both_missing_oauth_client_fields(self):
+        text = config("gdrive").replace("client_id = example.apps.googleusercontent.com\n", "")
+        text = text.replace("client_secret = example-client-secret\n", "")
+        with self.assertRaisesRegex(ValueError, r"client_id and client_secret"):
+            normalize_rclone_config(text)
+
+    def test_allows_section_header_comments(self):
+        text = config("gdrive").replace("[gdrive]", "[gdrive] # comment")
+        self.assertIn("[gdrive]", normalize_rclone_config(text))
+
     def test_keeps_existing_gdrive_remote(self):
         normalized = normalize_rclone_config(config("gdrive"))
         self.assertIn("[gdrive]", normalized)
