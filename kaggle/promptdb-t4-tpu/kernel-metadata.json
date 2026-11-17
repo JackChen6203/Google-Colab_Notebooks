@@ -1,0 +1,17 @@
+{
+  "id": "davis1233798/comfyui-promptdb-krea2-t4-tpu",
+  "title": "ComfyUI PromptDB Krea2 T4 TPU",
+  "code_file": "ComfyUI_PromptDB_Kaggle_T4_TPU.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "true",
+  "enable_gpu": "true",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "machine_shape": "NvidiaTeslaT4",
+  "docker_image_pinning_type": "latest",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

@@ -1,0 +1,475 @@
+diff --git a/comfy/cli_args.py b/comfy/cli_args.py
+index da0bbdb..4e589de 100644
+--- a/comfy/cli_args.py
++++ b/comfy/cli_args.py
+@@ -170,6 +170,7 @@ vram_group.add_argument("--highvram", action="store_true", help="By default mode
+ vram_group.add_argument("--lowvram", action="store_true", help="Doesn't do anything if dynamic vram is enabled. If dynamic vram isn't being used this option makes the text encoders run on the CPU.")
+ vram_group.add_argument("--novram", action="store_true", help="When lowvram isn't enough.")
+ vram_group.add_argument("--cpu", action="store_true", help="To use the CPU for everything (slow).")
++vram_group.add_argument("--xla", action="store_true", help="Experimental: use one PyTorch/XLA device for diffusion inference.")
+ 
+ parser.add_argument("--reserve-vram", type=float, default=None, help="Set the amount of vram in GB you want to reserve for use by your OS/other software. By default some amount is reserved depending on your OS.")
+ parser.add_argument("--vram-headroom", type=float, default=0, help="Set the amount of vram in GB for DynamicVRAM to maintain as extra headroom above default. ComfyUI will try and keep this much VRAM completely free and unused, even counting VRAM from other apps.")
+diff --git a/comfy/model_management.py b/comfy/model_management.py
+index f0699b6..cd1cf84 100644
+--- a/comfy/model_management.py
++++ b/comfy/model_management.py
+@@ -33,6 +33,7 @@ import comfy.memory_management
+ import comfy.system_memory
+ import comfy.utils
+ import comfy.quant_ops
++import comfy.xla_support
+ import comfy_aimdo.host_buffer
+ import comfy_aimdo.vram_buffer
+ from comfy.internal_logging import detail
+@@ -54,11 +55,13 @@ class CPUState(Enum):
+     GPU = 0
+     CPU = 1
+     MPS = 2
++    XLA = 3
+ 
+ # Determine VRAM State
+ vram_state = VRAMState.NORMAL_VRAM
+ set_vram_to = VRAMState.NORMAL_VRAM
+ cpu_state = CPUState.GPU
++XLA_RUNTIME = None
+ 
+ total_vram = 0
+ 
+@@ -139,6 +142,11 @@ try:
+ except:
+     ixuca_available = False
+ 
++if args.xla:
++    XLA_RUNTIME = comfy.xla_support.XlaRuntime.initialize()
++    cpu_state = CPUState.XLA
++    logging.info("Using PyTorch/XLA on %s", XLA_RUNTIME.device)
++
+ if args.cpu:
+     cpu_state = CPUState.CPU
+ 
+@@ -182,6 +190,8 @@ def get_torch_device():
+         return torch.device("mps")
+     if cpu_state == CPUState.CPU:
+         return torch.device("cpu")
++    if cpu_state == CPUState.XLA:
++        return XLA_RUNTIME.device
+     else:
+         if is_intel_xpu():
+             return torch.device("xpu", torch.xpu.current_device())
+@@ -300,6 +310,8 @@ def get_total_memory(dev=None, torch_total_too=False):
+     if hasattr(dev, 'type') and (dev.type == 'cpu' or dev.type == 'mps'):
+         mem_total = comfy.system_memory.virtual_memory_total()
+         mem_total_torch = mem_total
++    elif hasattr(dev, 'type') and dev.type == 'xla':
++        mem_total_torch, mem_total = XLA_RUNTIME.memory_info()
+     else:
+         if is_intel_xpu():
+             stats = torch.xpu.memory_stats(dev)
+@@ -462,6 +474,10 @@ if args.use_pytorch_cross_attention:
+     ENABLE_PYTORCH_ATTENTION = True
+     XFORMERS_IS_AVAILABLE = False
+ 
++if args.xla:
++    ENABLE_PYTORCH_ATTENTION = True
++    XFORMERS_IS_AVAILABLE = False
++
+ try:
+     if is_nvidia():
+         if torch_version_numeric[0] >= 2:
+@@ -542,7 +558,7 @@ except:
+     pass
+ 
+ 
+-if ENABLE_PYTORCH_ATTENTION:
++if ENABLE_PYTORCH_ATTENTION and cpu_state != CPUState.XLA:
+     torch.backends.cuda.enable_math_sdp(True)
+     torch.backends.cuda.enable_flash_sdp(True)
+     torch.backends.cuda.enable_mem_efficient_sdp(True)
+@@ -589,6 +605,10 @@ if cpu_state != CPUState.GPU:
+ 
+ if cpu_state == CPUState.MPS:
+     vram_state = VRAMState.SHARED
++elif cpu_state == CPUState.XLA:
++    # XLA exposes accelerator memory but has no CUDA allocator semantics. Keep
++    # Comfy's partial model loading enabled and use XLA's reported HBM budget.
++    vram_state = VRAMState.NORMAL_VRAM
+ 
+ logging.info(f"Set vram state to: {vram_state.name}")
+ 
+@@ -599,6 +619,8 @@ if DISABLE_SMART_MEMORY:
+ 
+ def get_torch_device_name(device):
+     if hasattr(device, 'type'):
++        if device.type == "xla":
++            return "{} (PyTorch/XLA)".format(device)
+         if device.type == "cuda":
+             try:
+                 allocator_backend = torch.cuda.get_allocator_backend()
+@@ -1213,7 +1235,7 @@ def text_encoder_offload_device():
+         return torch.device("cpu")
+ 
+ def text_encoder_device():
+-    if args.gpu_only:
++    if args.gpu_only or xla_mode():
+         return get_torch_device()
+     if comfy.memory_management.aimdo_enabled:
+         return get_torch_device()
+@@ -1254,6 +1276,9 @@ def text_encoder_dtype(device=None):
+     elif args.fp32_text_enc:
+         return torch.float32
+ 
++    if xla_mode():
++        return torch.bfloat16
++
+     if is_device_cpu(device):
+         return torch.float16
+ 
+@@ -1343,6 +1368,8 @@ def pick_weight_dtype(dtype, fallback_dtype, device=None):
+     return dtype
+ 
+ def device_supports_non_blocking(device):
++    if xla_mode():
++        return False
+     if args.force_non_blocking:
+         return True
+     if is_device_mps(device):
+@@ -1370,14 +1397,14 @@ else:
+     if is_nvidia() or is_amd():
+         NUM_STREAMS = 2
+ 
+-if args.disable_async_offload:
++if args.disable_async_offload or cpu_state == CPUState.XLA:
+     NUM_STREAMS = 0
+ 
+ if NUM_STREAMS > 0:
+     logging.info("Using async weight offloading with {} streams".format(NUM_STREAMS))
+ 
+ def current_stream(device):
+-    if device is None:
++    if device is None or xla_mode():
+         return None
+     if is_device_cuda(device):
+         return torch.cuda.current_stream()
+@@ -1783,13 +1810,14 @@ class HostWriter:
+             unpin_memory(buffer)
+ 
+ def sage_attention_enabled():
+-    return args.use_sage_attention
++    return args.use_sage_attention and not xla_mode()
++
+ 
+ def comfy_kitchen_attention_enabled():
+-    return args.use_ck_attention
++    return args.use_ck_attention and not xla_mode()
+ 
+ def flash_attention_enabled():
+-    return args.use_flash_attention
++    return args.use_flash_attention and not xla_mode()
+ 
+ def xformers_enabled():
+     global cpu_state
+@@ -1867,6 +1895,11 @@ def get_free_memory(dev=None, torch_free_too=False):
+     if hasattr(dev, 'type') and (dev.type == 'cpu' or dev.type == 'mps'):
+         mem_free_total = comfy.system_memory.virtual_memory_available()
+         mem_free_torch = mem_free_total
++    elif hasattr(dev, 'type') and dev.type == 'xla':
++        mem_used, mem_limit = XLA_RUNTIME.memory_info()
++        mem_free_total = max(0, mem_limit - mem_used)
++        # XLA does not expose a PyTorch caching-allocator reservation split.
++        mem_free_torch = 0
+     else:
+         if is_intel_xpu():
+             stats = torch.xpu.memory_stats(dev)
+@@ -1906,6 +1939,14 @@ def cpu_mode():
+     global cpu_state
+     return cpu_state == CPUState.CPU
+ 
++def xla_mode():
++    global cpu_state
++    return cpu_state == CPUState.XLA
++
++def mark_xla_step():
++    if xla_mode():
++        XLA_RUNTIME.mark_step()
++
+ def mps_mode():
+     global cpu_state
+     return cpu_state == CPUState.MPS
+@@ -1946,6 +1987,9 @@ def should_use_fp16(device=None, model_params=0, prioritize_performance=True, ma
+     if args.force_fp16:
+         return True
+ 
++    if xla_mode():
++        return False
++
+     if FORCE_FP32:
+         return False
+ 
+@@ -2010,6 +2054,9 @@ def should_use_bf16(device=None, model_params=0, prioritize_performance=True, ma
+     if FORCE_FP32:
+         return False
+ 
++    if xla_mode():
++        return True
++
+     if (device is not None and is_device_mps(device)) or mps_mode():
+         if mac_version() < (14,):
+             return False
+@@ -2053,6 +2100,11 @@ def should_use_bf16(device=None, model_params=0, prioritize_performance=True, ma
+     return False
+ 
+ def supports_fp8_compute(device=None):
++    if xla_mode() and (device is None or is_device_type(device, "xla")):
++        # PyTorch/XLA 2.9 lists fp8e4m3fn/fp8e5m2 support; exact shape
++        # coverage still depends on the installed libtpu and compiler.
++        return bool(FLOAT8_TYPES)
++
+     if is_device_cpu(device):
+         return False
+ 
+@@ -2109,6 +2161,8 @@ def supports_mxfp8_compute(device=None):
+     return True
+ 
+ def supports_fp64(device=None):
++    if xla_mode():
++        return False
+     if (device is not None and is_device_mps(device)) or mps_mode():
+         return False
+ 
+@@ -2121,6 +2175,8 @@ def supports_fp64(device=None):
+     return True
+ 
+ def supports_int8_compute(device=None):
++    if xla_mode():
++        return False
+     if is_device_cpu(device):
+         return False
+ 
+@@ -2162,7 +2218,9 @@ def lora_compute_dtype(device):
+ def synchronize():
+     if cpu_mode():
+         return
+-    if is_intel_xpu():
++    if xla_mode():
++        XLA_RUNTIME.synchronize()
++    elif is_intel_xpu():
+         torch.xpu.synchronize()
+     elif is_ascend_npu():
+         torch.npu.synchronize()
+@@ -2173,7 +2231,10 @@ def soft_empty_cache(force=False):
+     if cpu_mode():
+         return
+     global cpu_state
+-    if cpu_state == CPUState.MPS:
++    if cpu_state == CPUState.XLA:
++        # XLA has no CUDA-like empty_cache API; flush pending lazy work only.
++        XLA_RUNTIME.synchronize()
++    elif cpu_state == CPUState.MPS:
+         torch.mps.empty_cache()
+     elif is_intel_xpu():
+         torch.xpu.synchronize()
+diff --git a/comfy/samplers.py b/comfy/samplers.py
+index a7cc341..6f7a460 100755
+--- a/comfy/samplers.py
++++ b/comfy/samplers.py
+@@ -1001,6 +1001,7 @@ class KSAMPLER(Sampler):
+                 first_step = False
+             if callback is not None:
+                 callback(x["i"], x["denoised"], x["x"], total_steps)
++            comfy.model_management.mark_xla_step()
+ 
+         samples = self.sampler_function(model_k, noise, sigmas, extra_args=extra_args, callback=k_callback, disable=disable_pbar, **self.extra_options)
+         samples = model_wrap.inner_model.model_sampling.inverse_noise_scaling(sigmas[-1], samples)
+diff --git a/comfy/xla_support.py b/comfy/xla_support.py
+new file mode 100644
+index 0000000..ef6cc1a
+--- /dev/null
++++ b/comfy/xla_support.py
+@@ -0,0 +1,68 @@
++"""Small, single-device adapter for the legacy PyTorch/XLA runtime.
++
++This is experimental glue for PyTorch/XLA 2.9. It deliberately does not enable
++SPMD, custom XLA kernels, or silent fallback to CPU.
++"""
++from __future__ import annotations
++
++from dataclasses import dataclass
++from typing import Any
++
++import torch
++
++
++@dataclass(frozen=True)
++class XlaRuntime:
++    """The XLA module and one local device selected by PyTorch/XLA."""
++
++    xm: Any
++    torch_xla: Any
++    device: torch.device
++
++    @classmethod
++    def initialize(cls) -> "XlaRuntime":
++        try:
++            import torch_xla
++            import torch_xla.core.xla_model as xm
++            from torch_xla import runtime as xr
++        except ImportError as exc:
++            raise RuntimeError(
++                "--xla requires a matching PyTorch/XLA install; install PyTorch/XLA "
++                "for this Python/PyTorch runtime before starting ComfyUI."
++            ) from exc
++
++        device_type = xr.device_type()
++        if str(device_type).upper() != "TPU":
++            raise RuntimeError(f"--xla currently supports a TPU PJRT runtime; detected {device_type!r}")
++        device = xm.xla_device()
++        if not isinstance(device, torch.device) or device.type != "xla":
++            raise RuntimeError(f"PyTorch/XLA returned an unexpected device: {device!r}")
++        return cls(xm=xm, torch_xla=torch_xla, device=device)
++
++    def memory_info(self) -> tuple[int, int]:
++        """Return (used_bytes, limit_bytes) reported by XLA for the local device."""
++        info = self.xm.get_memory_info(self.device)
++        try:
++            used = int(info["bytes_used"])
++            limit = int(info["bytes_limit"])
++        except (KeyError, TypeError, ValueError) as exc:
++            raise RuntimeError(f"Invalid PyTorch/XLA memory report: {info!r}") from exc
++        if used < 0 or limit <= 0 or used > limit:
++            raise RuntimeError(f"Invalid PyTorch/XLA memory report: {info!r}")
++        return used, limit
++
++    def mark_step(self) -> None:
++        """Flush one denoising step so LazyTensor graphs do not grow across steps."""
++        sync = getattr(self.torch_xla, "sync", None)
++        if callable(sync):
++            sync()
++        else:
++            self.xm.mark_step()
++
++    def synchronize(self) -> None:
++        """Wait until queued XLA work completes, using the 2.9 API when present."""
++        sync = getattr(self.torch_xla, "sync", None)
++        if callable(sync):
++            sync(wait=True)
++            return
++        self.xm.mark_step(wait=True)
+diff --git a/tests-unit/comfy_test/test_xla_support.py b/tests-unit/comfy_test/test_xla_support.py
+new file mode 100644
+index 0000000..300c7f0
+--- /dev/null
++++ b/tests-unit/comfy_test/test_xla_support.py
+@@ -0,0 +1,112 @@
++import importlib.util
++import sys
++import types
++import unittest
++from pathlib import Path
++from unittest.mock import Mock, call, patch
++
++
++ROOT = Path(__file__).resolve().parents[2]
++MODULE_PATH = ROOT / "comfy" / "xla_support.py"
++
++
++class FakeDevice:
++    def __init__(self, name):
++        self.type = name.split(":", 1)[0]
++        self.name = name
++
++    def __repr__(self):
++        return self.name
++
++
++class XlaSupportTests(unittest.TestCase):
++    def load_module(self, torch_module):
++        spec = importlib.util.spec_from_file_location("xla_support_under_test", MODULE_PATH)
++        module = importlib.util.module_from_spec(spec)
++        with patch.dict(sys.modules, {"torch": torch_module}):
++            sys.modules[spec.name] = module
++            spec.loader.exec_module(module)
++        return module
++
++    def fake_runtime_modules(self, memory=None):
++        torch_module = types.ModuleType("torch")
++        torch_module.device = FakeDevice
++        xla_module = types.ModuleType("torch_xla")
++        xla_module.sync = Mock()
++        core_module = types.ModuleType("torch_xla.core")
++        runtime_module = types.ModuleType("torch_xla.runtime")
++        runtime_module.device_type = Mock(return_value="TPU")
++        xm_module = types.ModuleType("torch_xla.core.xla_model")
++        xm_module.xla_device = Mock(return_value=FakeDevice("xla:0"))
++        xm_module.get_memory_info = Mock(return_value=memory or {"bytes_used": "1024", "bytes_limit": 8192})
++        xm_module.mark_step = Mock()
++        xm_module.wait_device_ops = Mock()
++        core_module.xla_model = xm_module
++        xla_module.core = core_module
++        xla_module.runtime = runtime_module
++        modules = {
++            "torch": torch_module,
++            "torch_xla": xla_module,
++            "torch_xla.core": core_module,
++            "torch_xla.runtime": runtime_module,
++            "torch_xla.core.xla_model": xm_module,
++        }
++        return torch_module, xla_module, xm_module, runtime_module, modules
++
++    def test_initialize_and_read_memory(self):
++        torch_module, _, xm_module, runtime_module, modules = self.fake_runtime_modules()
++        with patch.dict(sys.modules, modules):
++            support = self.load_module(torch_module)
++            runtime = support.XlaRuntime.initialize()
++            self.assertEqual(runtime.device.type, "xla")
++            self.assertEqual(runtime.memory_info(), (1024, 8192))
++            xm_module.xla_device.assert_called_once_with()
++            runtime_module.device_type.assert_called_once_with()
++
++    def test_non_tpu_backend_is_rejected(self):
++        torch_module, _, _, runtime_module, modules = self.fake_runtime_modules()
++        runtime_module.device_type.return_value = "CPU"
++        with patch.dict(sys.modules, modules):
++            support = self.load_module(torch_module)
++            with self.assertRaisesRegex(RuntimeError, "supports a TPU PJRT runtime"):
++                support.XlaRuntime.initialize()
++
++    def test_invalid_memory_report_fails_closed(self):
++        torch_module, _, _, _, modules = self.fake_runtime_modules({"bytes_used": 9000, "bytes_limit": 8192})
++        with patch.dict(sys.modules, modules):
++            support = self.load_module(torch_module)
++            runtime = support.XlaRuntime.initialize()
++            with self.assertRaisesRegex(RuntimeError, "Invalid PyTorch/XLA memory report"):
++                runtime.memory_info()
++
++    def test_mark_step_and_synchronize(self):
++        torch_module, xla_module, xm_module, _, modules = self.fake_runtime_modules()
++        with patch.dict(sys.modules, modules):
++            support = self.load_module(torch_module)
++            runtime = support.XlaRuntime.initialize()
++            runtime.mark_step()
++            runtime.synchronize()
++            xm_module.mark_step.assert_not_called()
++            xla_module.sync.assert_has_calls([call(), call(wait=True)])
++
++    def test_synchronize_uses_mark_step_fallback(self):
++        torch_module, xla_module, xm_module, _, modules = self.fake_runtime_modules()
++        delattr(xla_module, "sync")
++        with patch.dict(sys.modules, modules):
++            support = self.load_module(torch_module)
++            runtime = support.XlaRuntime.initialize()
++            runtime.mark_step()
++            runtime.synchronize()
++            xm_module.mark_step.assert_has_calls([call(), call(wait=True)])
++
++    def test_missing_runtime_has_actionable_error(self):
++        torch_module = types.ModuleType("torch")
++        torch_module.device = FakeDevice
++        support = self.load_module(torch_module)
++        with patch.dict(sys.modules, {"torch": torch_module, "torch_xla": None}):
++            with self.assertRaisesRegex(RuntimeError, "--xla requires a matching PyTorch/XLA install"):
++                support.XlaRuntime.initialize()
++
++
++if __name__ == "__main__":
++    unittest.main()

@@ -1,0 +1,25 @@
+name: Publish PromptDB Krea2 T4 TPU notebook
+on:
+  push:
+    branches: [codex/kaggle-promptdb-t4-tpu]
+    paths:
+      - 'kaggle/promptdb-t4-tpu/**'
+      - 'promptdb_colab/**'
+      - '.github/workflows/deploy-kaggle-promptdb-t4-tpu.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade kaggle six
+      - name: Publish standalone notebook without starting a session
+        run: kaggle kernels push --path kaggle/promptdb-t4-tpu --no-run --timeout 300

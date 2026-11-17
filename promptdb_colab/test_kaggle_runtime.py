@@ -75,6 +75,43 @@ class NormalizeRcloneConfigTest(unittest.TestCase):
             normalize_rclone_config(text)
         self.assertNotIn("never-log-this", str(error.exception))
 
+class AcceleratorRuntimeTest(unittest.TestCase):
+    def test_requires_selected_t4(self):
+        from unittest.mock import patch
+        import kaggle_runtime as runtime
+        with patch.object(runtime.shutil, "which", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "GPU T4"):
+                runtime._validate_accelerator("gpu")
+
+    def test_rejects_unknown_accelerator(self):
+        import kaggle_runtime as runtime
+        with self.assertRaisesRegex(ValueError, "accelerator"):
+            runtime._validate_accelerator("cpu")
+
+    def test_tpu_requirements_protect_torch_packages(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        import kaggle_runtime as runtime
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            comfy = root / "comfy"
+            comfy.mkdir()
+            (comfy / "requirements.txt").write_text("torch\ntorchvision>=1\ntorch_xla==3\nlibtpu\nxformers\nnumpy>=1\n")
+            with patch.object(runtime, "_run") as run:
+                runtime._install_comfy_requirements(Path('/venv/bin/python'), comfy, root, "tpu")
+            self.assertEqual((root / "tpu-requirements-no-accelerator.txt").read_text(), "numpy>=1\n")
+            args = run.call_args.args[0]
+            self.assertIn("--constraint", args)
+            self.assertEqual(args[0], Path('/venv/bin/python'))
+
+    def test_xla_patch_matches_pinned_hash(self):
+        import hashlib
+        from pathlib import Path
+        import kaggle_runtime as runtime
+        patch = Path(runtime.__file__).with_name("kaggle_comfyui_xla.patch")
+        self.assertEqual(hashlib.sha256(patch.read_bytes()).hexdigest(), runtime.TPU_PATCH_SHA256)
+
 
 if __name__ == "__main__":
     unittest.main()

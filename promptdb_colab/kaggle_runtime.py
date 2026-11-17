@@ -12,6 +12,8 @@ import hashlib
 import html
 import importlib.util
 import json
+import os
+import platform
 import re
 import shutil
 import subprocess
@@ -32,6 +34,106 @@ CLOUDFLARED_DEB_URL = (
 REMOTE_NAME = "gdrive"
 COMFY_ENDPOINT = "http://127.0.0.1:8188"
 BACKUP_FOLDERS = ("models", "workflows", "user-db", "output", "logs")
+TPU_COMFY_COMMIT = "e9afbccc2669677076feb08e52658f129cd8c12b"
+TPU_PATCH_SHA256 = "52c0d818db799db68f3053f0f67d726171c22c1a9e6bf2daa48d38e8dc1ddf7b"
+TPU_VERSIONS = {"torch": "2.9.0+cpu", "torchvision": "0.24.0+cpu", "torch_xla": "2.9.0", "libtpu": "0.0.21.1"}
+
+
+def _validate_accelerator(accelerator):
+    if accelerator not in ("gpu", "tpu"):
+        raise ValueError("accelerator must be 'gpu' or 'tpu'.")
+    if accelerator == "gpu":
+        smi = shutil.which("nvidia-smi")
+        if not smi:
+            raise RuntimeError("請在 Kaggle Settings → Accelerator 選擇 GPU T4 x2，等待 Session 啟動後重新執行。")
+        result = _run([smi, "-L"], label="NVIDIA GPU check", timeout=30)
+        if "T4" not in result.stdout.upper():
+            raise RuntimeError("請在 Kaggle Settings → Accelerator 選擇 GPU T4 x2。")
+        print("已偵測 Kaggle T4 GPU。", flush=True)
+    elif (sys.platform != "linux" or platform.machine().lower() not in ("x86_64", "amd64")
+          or sys.version_info[:2] not in ((3, 11), (3, 12), (3, 13))):
+        raise RuntimeError("TPU 環境需要 Linux x86_64 與 Python 3.11–3.13。")
+
+
+def _prepare_tpu_python(working):
+    """Install an isolated pinned XLA runtime without depending on ensurepip."""
+    runtime = working / f"tpu-env-py{sys.version_info.major}{sys.version_info.minor}"
+    python = runtime / "bin" / "python"
+    marker = runtime / ".promptdb-tpu-runtime.json"
+    expected = {"base_python": list(sys.version_info[:3]), "versions": TPU_VERSIONS}
+    if runtime.exists():
+        if not marker.is_file() or not python.is_file() or json.loads(marker.read_text()) != expected:
+            raise RuntimeError(f"TPU runtime path {runtime} exists without a matching ownership marker; refusing to change it.")
+    else:
+        bootstrap = working / "virtualenv-bootstrap"
+        _run([sys.executable, "-m", "pip", "install", "--target", bootstrap, "virtualenv>=20.26,<21"], label="virtualenv bootstrap", timeout=600)
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(bootstrap) + os.pathsep + env.get("PYTHONPATH", "")
+        try:
+            subprocess.run([sys.executable, "-m", "virtualenv", str(runtime)], env=env, check=True, timeout=300, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            raise RuntimeError(f"TPU virtualenv creation failed ({type(error).__name__}).") from None
+        _run([python, "-m", "pip", "install", "--index-url", "https://pypi.org/simple", "--extra-index-url", "https://download.pytorch.org/whl/cpu", "torch==2.9.0+cpu", "torchvision==0.24.0+cpu"], label="TPU PyTorch installation", timeout=1800)
+        _run([python, "-m", "pip", "install", "--find-links", "https://storage.googleapis.com/libtpu-wheels/index.html", "torch_xla==2.9.0", "libtpu==0.0.21.1"], label="TPU XLA installation", timeout=1800)
+        marker.write_text(json.dumps(expected))
+    probe = "import importlib.metadata,json; print(json.dumps({n:importlib.metadata.version(n) for n in ('torch','torchvision','torch_xla','libtpu')}))"
+    versions = json.loads(_run([python, "-c", probe], label="TPU package check", timeout=60).stdout)
+    if versions != TPU_VERSIONS:
+        raise RuntimeError(f"TPU dependency versions do not match the pinned runtime: {versions}")
+    smoke = "import torch; import torch_xla.core.xla_model as xm; d=xm.xla_device(); r=torch.ones((2,2),device=d)@torch.ones((2,2),device=d); xm.mark_step(); print(r.cpu())"
+    env = os.environ.copy()
+    env["PJRT_DEVICE"] = "TPU"
+    try:
+        subprocess.run([str(python), "-c", smoke], env=env, check=True, timeout=180, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError(f"TPU 檢查失敗（{type(error).__name__}）；請在 Kaggle Settings 選擇 TPU 並等待 Session 啟動。") from None
+    print("TPU XLA 運算檢查通過；這不代表 Krea2 圖片生成已驗證。", flush=True)
+    return python
+
+
+def _prepare_tpu_comfy(repo, comfy):
+    """Pin ComfyUI to the exact revision supported by the audited XLA patch."""
+    patch = repo / "promptdb_colab" / "kaggle_comfyui_xla.patch"
+    if not patch.is_file() or hashlib.sha256(patch.read_bytes()).hexdigest() != TPU_PATCH_SHA256:
+        raise RuntimeError("TPU XLA patch missing or checksum mismatch.")
+    if not comfy.exists():
+        _run(["git", "clone", "--filter=blob:none", "--no-checkout", "https://github.com/Comfy-Org/ComfyUI.git", comfy], label="TPU ComfyUI clone", timeout=900)
+        _run(["git", "-C", comfy, "fetch", "--depth", "1", "origin", TPU_COMFY_COMMIT], label="TPU pinned revision fetch", timeout=900)
+        _run(["git", "-C", comfy, "checkout", "--detach", "FETCH_HEAD"], label="TPU pinned revision checkout", timeout=300)
+    actual = _run(["git", "-C", comfy, "rev-parse", "HEAD"], label="TPU revision check").stdout.strip()
+    if actual != TPU_COMFY_COMMIT:
+        raise RuntimeError("Existing TPU checkout does not match the pinned ComfyUI revision; it will not be modified.")
+    forward = subprocess.run(["git", "-C", str(comfy), "apply", "--check", str(patch)], capture_output=True)
+    if forward.returncode == 0:
+        _run(["git", "-C", comfy, "apply", patch], label="TPU XLA patch")
+    else:
+        reverse = subprocess.run(["git", "-C", str(comfy), "apply", "--reverse", "--check", str(patch)], capture_output=True)
+        if reverse.returncode:
+            raise RuntimeError("TPU XLA patch conflicts with the existing checkout; it will not be modified.")
+
+
+def _install_comfy_requirements(python, comfy, working, accelerator):
+    requirements = comfy / "requirements.txt"
+    if accelerator == "tpu":
+        protected = {"torch", "torchvision", "torchaudio", "torch-xla", "libtpu", "xformers"}
+        lines = []
+        for raw in requirements.read_text().splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            match = re.match(r"([A-Za-z0-9_.-]+)", line)
+            if match and match.group(1).lower().replace("_", "-") in protected:
+                continue
+            lines.append(line)
+        filtered = working / "tpu-requirements-no-accelerator.txt"
+        filtered.write_text("\n".join(lines) + "\n")
+        constraints = working / "tpu-constraints.txt"
+        constraints.write_text("torch==2.9.0+cpu\ntorchvision==0.24.0\ntorch_xla==2.9.0\nlibtpu==0.0.21.1\n")
+        command = [python, "-m", "pip", "install", "-r", filtered, "--constraint", constraints]
+    else:
+        command = [python, "-m", "pip", "install", "-r", requirements]
+    _run(command, label="ComfyUI dependency installation", timeout=1800)
+
 
 
 def _run(args, *, label, input_text=None, timeout=None):
@@ -304,15 +406,18 @@ def bootstrap(
     store_models_on_drive=True,
     download_krea2_models=True,
     force_verify_models=False,
+    accelerator="gpu",
 ):
     """Prepare Drive data, ComfyUI, PromptDB and default Krea2 models."""
+    _validate_accelerator(accelerator)
     repo = Path(repo).resolve()
     # Keep large models and the ComfyUI checkout outside /kaggle/working so Kaggle
     # does not try to package them as notebook output files at the end of a run.
     working = Path("/kaggle/temp/promptdb-runtime")
     working.mkdir(parents=True, exist_ok=True)
     private = working / "ComfyUI-PromptDB"
-    comfy = working / "ComfyUI"
+    comfy = working / ("ComfyUI-TPU" if accelerator == "tpu" else "ComfyUI")
+    runtime_python = _prepare_tpu_python(working) if accelerator == "tpu" else Path(sys.executable)
     logs = private / "logs"
     for folder in ("output", "models", "workflows", "user-db", "logs"):
         (private / folder).mkdir(parents=True, exist_ok=True)
@@ -352,7 +457,9 @@ def bootstrap(
         )
     print(f"Google Drive workspace is ready: {base}", flush=True)
 
-    if not (comfy / "main.py").is_file():
+    if accelerator == "tpu":
+        _prepare_tpu_comfy(repo, comfy)
+    elif not (comfy / "main.py").is_file():
         _run(["git", "clone", "https://github.com/Comfy-Org/ComfyUI.git", comfy], label="ComfyUI clone", timeout=900)
     else:
         print("Using the existing Kaggle ComfyUI checkout.", flush=True)
@@ -361,12 +468,7 @@ def bootstrap(
     if store_models_on_drive:
         setup.configure_model_cache(comfy, private / "models")
 
-    requirements = comfy / "requirements.txt"
-    _run(
-        [sys.executable, "-m", "pip", "install", "-r", requirements],
-        label="ComfyUI dependency installation",
-        timeout=1800,
-    )
+    _install_comfy_requirements(runtime_python, comfy, working, accelerator)
     print("ComfyUI dependencies are ready.", flush=True)
 
     examples = repo / "promptdb_colab" / "examples" / "workflows"
@@ -429,6 +531,8 @@ def bootstrap(
 
     return {
         "repo": repo,
+        "accelerator": accelerator,
+        "runtime_python": runtime_python,
         "comfy": comfy,
         "private": private,
         "logs": logs,
@@ -486,9 +590,14 @@ def start_services(context, *, enable_cloudflare=True, backup_output=True, backu
     output.mkdir(parents=True, exist_ok=True)
     comfy_log = logs / "comfyui.log"
     server_log = comfy_log.open("a", encoding="utf-8")
+    server_env = os.environ.copy()
+    server_args = []
+    if context.get("accelerator") == "tpu":
+        server_env["PJRT_DEVICE"] = "TPU"
+        server_args = ["--xla", "--cpu-vae"]
     server = subprocess.Popen(
         [
-            sys.executable,
+            str(context.get("runtime_python", sys.executable)),
             str(comfy / "main.py"),
             "--listen",
             "0.0.0.0",
@@ -497,8 +606,10 @@ def start_services(context, *, enable_cloudflare=True, backup_output=True, backu
             "--cache-none",
             "--output-directory",
             str(output),
+            *server_args,
         ],
         cwd=comfy,
+        env=server_env,
         stdout=server_log,
         stderr=subprocess.STDOUT,
         start_new_session=True,
