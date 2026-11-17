@@ -1,0 +1,17 @@
+{
+  "id": "davis1233798/comfyui-krea2-t4-tpu",
+  "title": "ComfyUI Krea2 T4 TPU",
+  "code_file": "notebook.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "true",
+  "enable_gpu": "true",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "machine_shape": "NvidiaTeslaT4",
+  "docker_image_pinning_type": "latest",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}
