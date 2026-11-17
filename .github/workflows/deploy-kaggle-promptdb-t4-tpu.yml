@@ -4,6 +4,7 @@ on:
     branches: [codex/kaggle-promptdb-t4-tpu]
     paths:
       - 'kaggle/promptdb-t4-tpu/**'
+      - 'kaggle/network-check/**'
       - 'promptdb_colab/**'
       - '.github/workflows/deploy-kaggle-promptdb-t4-tpu.yml'
   workflow_dispatch:
