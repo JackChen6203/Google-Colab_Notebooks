@@ -91,6 +91,21 @@ def _prepare_tpu_python(working):
     return python
 
 
+def _prepare_gpu_comfy(comfy):
+    """Use the exact ComfyUI revision exercised by the isolated T4 test."""
+    if not comfy.exists():
+        _run(["git", "clone", "--filter=blob:none", "--no-checkout", "https://github.com/Comfy-Org/ComfyUI.git", comfy], label="GPU ComfyUI clone", timeout=900)
+        _run(["git", "-C", comfy, "fetch", "--depth", "1", "origin", TPU_COMFY_COMMIT], label="GPU pinned revision fetch", timeout=900)
+        _run(["git", "-C", comfy, "checkout", "--detach", "FETCH_HEAD"], label="GPU pinned revision checkout", timeout=300)
+    else:
+        if not (comfy / ".git").is_dir():
+            raise RuntimeError(f"Existing ComfyUI path {comfy} is not a Git checkout; it will not be modified.")
+        actual = _run(["git", "-C", comfy, "rev-parse", "HEAD"], label="GPU revision check").stdout.strip()
+        if actual != TPU_COMFY_COMMIT:
+            raise RuntimeError(f"Existing GPU checkout {comfy} is not the tested revision; it will not be modified. Start a new Kaggle session.")
+    print("GPU ComfyUI pinned to T4-tested revision:", TPU_COMFY_COMMIT, flush=True)
+
+
 def _prepare_tpu_comfy(repo, comfy):
     """Pin ComfyUI to the exact revision supported by the audited XLA patch."""
     patch = repo / "promptdb_colab" / "kaggle_comfyui_xla.patch"
@@ -459,10 +474,8 @@ def bootstrap(
 
     if accelerator == "tpu":
         _prepare_tpu_comfy(repo, comfy)
-    elif not (comfy / "main.py").is_file():
-        _run(["git", "clone", "https://github.com/Comfy-Org/ComfyUI.git", comfy], label="ComfyUI clone", timeout=900)
     else:
-        print("Using the existing Kaggle ComfyUI checkout.", flush=True)
+        _prepare_gpu_comfy(comfy)
 
     setup = _load_setup_module(repo)
     if store_models_on_drive:

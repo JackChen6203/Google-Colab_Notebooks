@@ -105,6 +105,19 @@ class AcceleratorRuntimeTest(unittest.TestCase):
             self.assertIn("--constraint", args)
             self.assertEqual(args[0], Path('/venv/bin/python'))
 
+    def test_gpu_checkout_refuses_unverified_existing_revision(self):
+        import tempfile
+        from pathlib import Path
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        import kaggle_runtime as runtime
+        with tempfile.TemporaryDirectory() as folder:
+            comfy = Path(folder)
+            (comfy / ".git").mkdir()
+            with patch.object(runtime, "_run", return_value=SimpleNamespace(stdout="different-revision\n")):
+                with self.assertRaisesRegex(RuntimeError, "not the tested revision"):
+                    runtime._prepare_gpu_comfy(comfy)
+
     def test_xla_patch_matches_pinned_hash(self):
         import hashlib
         from pathlib import Path
