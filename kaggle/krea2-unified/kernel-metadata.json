@@ -1,6 +1,6 @@
 {
-  "id": "davis1233798/comfyui-krea2-t4-tpu",
-  "title": "ComfyUI Krea2 T4 TPU",
+  "id": "davis1233798/comfyui-krea2-t4-generation-check",
+  "title": "ComfyUI Krea2 T4 Generation Check",
   "code_file": "notebook.ipynb",
   "language": "python",
   "kernel_type": "notebook",
