@@ -28,3 +28,11 @@ jobs:
           done
           kaggle kernels logs davis1233798/comfyui-krea2-t4-generation-check || true
           if grep -Eiq 'error|failed|cancel' <<<"$status"; then exit 1; fi
+      - name: Retrieve verified generated image only
+        run: kaggle kernels output davis1233798/comfyui-krea2-t4-generation-check -p /tmp/krea2-image --file-pattern 'Kaggle_Krea2_Neutrino_00001_\\.png$'
+      - name: Upload generated image for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: krea2-t4-generation-image
+          path: /tmp/krea2-image/**/Kaggle_Krea2_Neutrino_00001_.png
+          if-no-files-found: error
