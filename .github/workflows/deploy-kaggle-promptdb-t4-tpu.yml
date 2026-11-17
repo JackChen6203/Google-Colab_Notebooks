@@ -23,3 +23,16 @@ jobs:
       - run: python -m pip install --upgrade kaggle six
       - name: Publish standalone notebook without starting a session
         run: kaggle kernels push --path kaggle/promptdb-t4-tpu --no-run --timeout 300
+      - name: Run separate CPU network diagnostic
+        run: kaggle kernels push --path kaggle/network-check --timeout 300
+      - name: Read diagnostic status
+        shell: bash
+        run: |
+          for attempt in {1..12}; do
+            status="$(kaggle kernels status davis1233798/promptdb-kaggle-network-diagnostic 2>&1)" || { echo "$status"; exit 1; }
+            echo "$status"
+            if grep -Eiq 'complete|error|failed|cancel' <<<"$status"; then break; fi
+            sleep 10
+          done
+          kaggle kernels logs davis1233798/promptdb-kaggle-network-diagnostic || true
+          if ! grep -Eiq 'complete' <<<"$status"; then exit 1; fi
