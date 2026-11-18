@@ -32,6 +32,9 @@ jobs:
           except Exception:
               print('No parseable execution log available.'); raise SystemExit
           markers = ('Google Drive OAuth authorization verified', 'Google Drive workspace is ready', 'Activated Drive prompt database:', 'PromptDB bootstrap completed', 'ComfyUI is ready', 'Verified the public ComfyUI page', 'Kaggle Secret', 'Could not resolve host', 'RuntimeError:', 'Traceback', 'Error occurred')
+          joined = '\n'.join(item.get('data', '') for item in items)
+          print('SECRET_UNAVAILABLE:', "Kaggle Secret 'RCLONE_CONFIG_TEXT' is unavailable" in joined)
+          print('SECRET_EMPTY:', "Kaggle Secret 'RCLONE_CONFIG_TEXT' is empty or unavailable" in joined)
           for item in items:
               data = item.get('data', '')
               for line in data.splitlines():
